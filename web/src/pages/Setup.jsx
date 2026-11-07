@@ -1,13 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, Link, Stack, Typography } from '@mui/material';
-import { CircleCheck, Globe, Circle, Download, ExternalLink, LogIn, Play, RefreshCw, SquareTerminal } from 'lucide-react';
+import { CircleCheck, Globe, Circle, PlugZap, Download, ExternalLink, LogIn, Play, RefreshCw, SquareTerminal } from 'lucide-react';
 import { api } from '../api.js';
 import { Panel, WorkerControl } from '../components.jsx';
 
 const CHROME_EXTENSION_URL = 'https://claude.ai/chrome';
 
+const PLAN_LABEL = { pro: 'Pro', max: 'Max', team: 'Team', enterprise: 'Enterprise', free: 'Free' };
+
+// Logged in with a Claude subscription (not an API key) on a plan that includes Claude Code.
+export function claudeReady(s) {
+  return Boolean(s?.claude_installed && s.logged_in && s.subscription && s.paid_plan !== false);
+}
+
 export function setupReady(s) {
-  return Boolean(s?.claude_installed && s.logged_in && s.subscription);
+  return claudeReady(s) && Boolean(s.chrome_extension?.length);
 }
 
 function Step({ n, done, title, children }) {
@@ -29,6 +36,11 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [checking, setChecking] = useState(false);
+  const [chromeTest, setChromeTest] = useState(null); // null | 'running' | { ok, browsers, error }
+  async function testChrome() {
+    setChromeTest('running');
+    try { setChromeTest(await api.testChrome()); } catch (e) { setChromeTest({ ok: false, error: e.message }); }
+  }
 
   const check = useCallback(async () => {
     setChecking(true);
@@ -82,11 +94,20 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
           )}
         </Step>
 
-        <Step n={2} done={s.logged_in && s.subscription} title="Log in with your Claude account">
-          {s.logged_in && s.subscription && <>Logged in{s.email ? ` as ${s.email}` : ''} with your Claude subscription.</>}
+        <Step n={2} done={claudeReady(s)} title="Log in with your Claude subscription">
+          {claudeReady(s) && (
+            <>Logged in{s.email ? ` as ${s.email}` : ''} on Claude {PLAN_LABEL[s.plan] || 'subscription'}{s.plan ? '' : ' (plan not reported by this Claude Code version)'}.</>
+          )}
           {s.logged_in && !s.subscription && (
             <Alert severity="warning" sx={{ mb: 1.25 }}>
               Claude Code is logged in with {s.auth_method || 'an API key'}, which bills API usage. Log in again and choose your Claude account.
+            </Alert>
+          )}
+          {s.logged_in && s.subscription && s.paid_plan === false && (
+            <Alert severity="warning" sx={{ mb: 1.25 }}
+              action={<Button color="inherit" size="small" href="https://claude.ai/upgrade" target="_blank" rel="noreferrer">Upgrade</Button>}>
+              Your Claude account is on the {PLAN_LABEL[s.plan] || s.plan} plan. Claude Code with Chrome needs Claude Pro or Max.
+              Upgrade, then click Check again.
             </Alert>
           )}
           {!(s.logged_in && s.subscription) && (
@@ -102,15 +123,45 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
           )}
         </Step>
 
-        <Step n={3} done={false} title="Connect Chrome and your social accounts">
-          <Typography fontSize={14} mb={1.25}>
-            Install the <strong>Claude in Chrome</strong> extension, sign in to it with the same Claude account, and make sure
-            that Chrome is logged in to every account you'll post to (Facebook, LinkedIn, X, Threads, Reddit, Instagram, TikTok). Keep Chrome open when posts are due.
+        <Step n={3} done={Boolean(s.chrome_extension?.length) && chromeTest?.ok === true}
+          title="Install Claude in Chrome and connect it">
+          {s.chrome_extension?.length ? (
+            <Typography fontSize={14} mb={1.25}>
+              <strong>Installed</strong> in {s.chrome_extension.map((e) => `${e.browser} (${e.profile})`).join(', ')}.
+              Sign in to the extension with the same Claude account, keep that Chrome open when posts are due, and log it in to
+              every account you'll post to.
+            </Typography>
+          ) : (
+            <>
+              <Alert severity="warning" sx={{ mb: 1.25 }}>
+                The Claude in Chrome extension isn't installed in Chrome on this computer yet.
+              </Alert>
+              <Typography fontSize={14} mb={1.25}>
+                Install it, sign in to it with the same Claude account, then click Check again.
+              </Typography>
+            </>
+          )}
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {!s.chrome_extension?.length && (
+              <Button variant="contained" startIcon={<Globe size={16} />} endIcon={<ExternalLink size={14} />}
+                href={CHROME_EXTENSION_URL} target="_blank" rel="noreferrer">
+                Get Claude in Chrome
+              </Button>
+            )}
+            <Button variant={s.chrome_extension?.length ? 'contained' : 'outlined'} color={s.chrome_extension?.length ? 'primary' : 'secondary'}
+              startIcon={<PlugZap size={16} />} disabled={!claudeReady(s) || chromeTest === 'running'} onClick={testChrome}>
+              {chromeTest === 'running' ? 'Testing… (up to a minute)' : 'Test connection'}
+            </Button>
+          </Stack>
+          {chromeTest && chromeTest !== 'running' && (chromeTest.ok
+            ? <Alert severity="success" sx={{ mt: 1.25 }}>Connected: Claude can reach {chromeTest.browsers} Chrome browser{chromeTest.browsers === 1 ? '' : 's'}.</Alert>
+            : <Alert severity="error" sx={{ mt: 1.25 }}>
+                Claude couldn't reach Chrome{chromeTest.error ? `: ${chromeTest.error}` : '.'} Open Chrome, make sure the extension is
+                signed in to your Claude account, then test again.
+              </Alert>)}
+          <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+            The test asks Claude to list your connected browsers. It takes a few seconds and a tiny bit of your Claude usage.
           </Typography>
-          <Button variant="outlined" color="secondary" startIcon={<Globe size={16} />} endIcon={<ExternalLink size={14} />}
-            href={CHROME_EXTENSION_URL} target="_blank" rel="noreferrer">
-            Get Claude in Chrome
-          </Button>
         </Step>
 
         <Step n={4} done={false} title="Send a test post">

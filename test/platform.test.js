@@ -48,3 +48,25 @@ test('the claude folder goes first on PATH', () => {
   const env = envWithClaude('/x/bin/claude', { PATH: '/usr/bin' });
   assert.ok(env.PATH.startsWith(`/x/bin${path.delimiter}`));
 });
+
+test('auth status reports the Claude plan', async () => {
+  const { parseAuthStatus } = await import('../src/platform.js');
+  assert.deepEqual(parseAuthStatus('{"loggedIn":true,"authMethod":"claude.ai","email":"a@b.c","subscriptionType":"max"}'),
+    { loggedIn: true, authMethod: 'claude.ai', email: 'a@b.c', plan: 'max' });
+  assert.equal(parseAuthStatus('{"loggedIn":false}').plan, null);
+});
+
+test('finds the Claude in Chrome extension per Chrome profile, with profile names', async () => {
+  const { findClaudeExtension, CLAUDE_EXTENSION_ID } = await import('../src/platform.js');
+  const home = tmpHome();
+  const chrome = path.join(home, 'Library', 'Application Support', 'Google', 'Chrome');
+  fs.mkdirSync(path.join(chrome, 'Default', 'Extensions', CLAUDE_EXTENSION_ID), { recursive: true });
+  fs.mkdirSync(path.join(chrome, 'Profile 2', 'Extensions', 'someotherextension'), { recursive: true });
+  fs.writeFileSync(path.join(chrome, 'Local State'), JSON.stringify({ profile: { info_cache: { Default: { name: 'Work' } } } }));
+  assert.deepEqual(findClaudeExtension({ home, platform: 'darwin' }), [{ browser: 'Chrome', profile: 'Work' }]);
+  assert.deepEqual(findClaudeExtension({ home: tmpHome(), platform: 'darwin' }), []);
+  const win = tmpHome();
+  const local = path.join(win, 'AppData', 'Local');
+  fs.mkdirSync(path.join(local, 'Google', 'Chrome', 'User Data', 'Default', 'Extensions', CLAUDE_EXTENSION_ID), { recursive: true });
+  assert.deepEqual(findClaudeExtension({ home: win, env: { LOCALAPPDATA: local }, platform: 'win32' }), [{ browser: 'Chrome', profile: 'Default' }]);
+});

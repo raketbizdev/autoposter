@@ -2,7 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
 import os from 'node:os';
-import { spawnNodeScript, findClaude, claudeAuthStatus, openTerminal, CLAUDE_INSTALL_COMMAND, claudeLoginCommand, IN_ELECTRON } from './platform.js';
+import { spawnNodeScript, findClaude, claudeAuthStatus, openTerminal, CLAUDE_INSTALL_COMMAND, claudeLoginCommand, IN_ELECTRON, findClaudeExtension } from './platform.js';
+import { testChromeConnection } from './runner.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { paths as getPaths, PORT, HOST, LIMITS } from './config.js';
@@ -24,6 +25,7 @@ function postAsValue(platform, type, value) {
 const NUMERIC_SETTINGS = { daily_cap: [1, 200], group_gap_minutes: [0, 1440], max_attempts: [1, 5], job_timeout_min: [3, 60],
   join_recheck_hours: [1, 48], join_wait_days: [1, 60] };
 const MODELS = new Set(['sonnet', 'opus', 'haiku']);
+const PAID_PLANS = new Set(['pro', 'max', 'team', 'enterprise']);
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -309,7 +311,17 @@ export function createApp(db, p) {
       subscription: auth?.authMethod === 'claude.ai',
       auth_method: auth?.authMethod ?? null,
       email: auth?.email ?? null,
+      // Claude Code in Chrome needs a paid plan. null: this Claude Code version doesn't report it.
+      plan: auth?.plan ?? null,
+      paid_plan: auth?.plan ? PAID_PLANS.has(auth.plan) : null,
+      chrome_extension: findClaudeExtension(),
     });
+  });
+  // Asks Claude to list the Chrome browsers it can reach. Uses a tiny amount of the person's Claude usage.
+  app.post('/api/setup/test-chrome', async (req, res) => {
+    const bin = findClaude();
+    if (!bin) throw new HttpError(409, 'Install Claude Code first');
+    res.json(await testChromeConnection(bin, p));
   });
   // Both open a terminal window: the installer and the browser login need the person, not the app.
   app.post('/api/setup/install-claude', (req, res) => {

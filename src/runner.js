@@ -130,3 +130,40 @@ export async function runJob(job, media, { paths, settings, claudeBin = findClau
     raw: envelope,
   };
 }
+
+/**
+ * Checks Claude Code can reach the Claude in Chrome extension: asks Claude to list connected browsers.
+ * Returns { ok, browsers, error }.
+ */
+export async function testChromeConnection(claudeBin, paths, { timeoutMs = 120_000 } = {}) {
+  const workDir = path.join(paths.jobs, 'chrome-test');
+  fs.mkdirSync(workDir, { recursive: true });
+  const args = [
+    '-p', '--chrome', '--no-session-persistence', '--output-format', 'json', '--model', 'haiku',
+    '--strict-mcp-config', '--disable-slash-commands',
+    '--allowedTools', 'mcp__claude-in-chrome__list_connected_browsers',
+    '--disallowedTools', ...DENIED_TOOLS,
+  ];
+  const prompt = 'Call the list_connected_browsers tool once. Then reply with only this JSON and nothing else: '
+    + '{"browsers": <how many browsers it listed>}. If the tool is missing or fails, reply {"browsers": 0, "error": "<short reason>"}.';
+  const { stdout, stderr, timedOut } = await new Promise((resolve) => {
+    const child = spawnClaude(claudeBin, args, { cwd: workDir, env: cleanEnv(envWithClaude(claudeBin)), stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    let killed = false;
+    const timer = setTimeout(() => { killed = true; killTree(child); }, timeoutMs);
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => { err += String(e); });
+    child.on('close', () => { clearTimeout(timer); resolve({ stdout: out, stderr: err, timedOut: killed }); });
+    child.stdin.end(prompt);
+  });
+  if (timedOut) return { ok: false, browsers: 0, error: 'Claude did not answer in time. Is Chrome open?' };
+  let text = '';
+  try { text = JSON.parse(stdout).result ?? ''; } catch { return { ok: false, browsers: 0, error: (stderr || stdout).slice(0, 300) || 'No answer from Claude' }; }
+  const m = text.match(/\{[\s\S]*\}/);
+  let r = null;
+  try { r = m ? JSON.parse(m[0]) : null; } catch { /* handled below */ }
+  if (!r || typeof r.browsers !== 'number') return { ok: false, browsers: 0, error: text.slice(0, 300) || 'Unreadable answer' };
+  return { ok: r.browsers > 0, browsers: r.browsers, error: r.browsers > 0 ? null : (r.error || 'No Chrome browser is connected') };
+}

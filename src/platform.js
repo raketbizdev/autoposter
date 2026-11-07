@@ -99,6 +99,17 @@ export function envWithClaude(bin, env = process.env) {
   return { ...env, [key]: `${path.dirname(bin)}${sep}${env[key] || ''}` };
 }
 
+export function parseAuthStatus(text) {
+  const s = JSON.parse(text);
+  return {
+    loggedIn: Boolean(s.loggedIn),
+    authMethod: s.authMethod ?? null,
+    email: s.email ?? null,
+    // 'pro', 'max', 'team', 'enterprise'… Missing on older Claude Code versions.
+    plan: s.subscriptionType ?? null,
+  };
+}
+
 /** Runs `claude auth status`. Returns { loggedIn, authMethod, email } or null when claude can't be run. */
 export function claudeAuthStatus(bin) {
   if (!bin) return null;
@@ -106,13 +117,11 @@ export function claudeAuthStatus(bin) {
     const out = IS_WIN && /\.(cmd|bat)$/i.test(bin)
       ? execFileSync('cmd.exe', ['/d', '/s', '/c', `${quoteForCmd(bin)} auth status`], { encoding: 'utf8', timeout: 20_000, windowsHide: true })
       : execFileSync(bin, ['auth', 'status'], { encoding: 'utf8', timeout: 20_000, env: envWithClaude(bin) });
-    const s = JSON.parse(out);
-    return { loggedIn: Boolean(s.loggedIn), authMethod: s.authMethod ?? null, email: s.email ?? null };
+    return parseAuthStatus(out);
   } catch (err) {
     // `auth status` exits non-zero when logged out but still prints JSON.
     try {
-      const s = JSON.parse(String(err.stdout || ''));
-      return { loggedIn: Boolean(s.loggedIn), authMethod: s.authMethod ?? null, email: s.email ?? null };
+      return parseAuthStatus(String(err.stdout || ''));
     } catch {
       return null;
     }
@@ -149,4 +158,44 @@ export const CLAUDE_INSTALL_COMMAND = IS_WIN
 export function claudeLoginCommand(bin) {
   const exe = bin ? (IS_WIN ? `& ${JSON.stringify(bin)}` : JSON.stringify(bin)) : 'claude';
   return `${exe} auth login --claudeai`;
+}
+
+// The Claude in Chrome extension's ID in the Chrome Web Store.
+export const CLAUDE_EXTENSION_ID = 'fcoeoabgfenejglbffodgkkbkcdhcgfn';
+
+/** Chrome-family user-data folders on this computer. */
+export function chromeDataDirs({ home = os.homedir(), env = process.env, platform = process.platform } = {}) {
+  if (platform === 'win32') {
+    const local = env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+    return [
+      ['Chrome', path.join(local, 'Google', 'Chrome', 'User Data')],
+      ['Chrome Beta', path.join(local, 'Google', 'Chrome Beta', 'User Data')],
+      ['Chrome Canary', path.join(local, 'Google', 'Chrome SxS', 'User Data')],
+    ];
+  }
+  if (platform === 'darwin') {
+    const base = path.join(home, 'Library', 'Application Support', 'Google');
+    return [['Chrome', path.join(base, 'Chrome')], ['Chrome Beta', path.join(base, 'Chrome Beta')], ['Chrome Canary', path.join(base, 'Chrome Canary')]];
+  }
+  return [['Chrome', path.join(home, '.config', 'google-chrome')], ['Chrome Beta', path.join(home, '.config', 'google-chrome-beta')]];
+}
+
+/**
+ * Chrome profiles that have the Claude in Chrome extension installed, read from disk (no browser needed).
+ * Returns [{ browser, profile }] with the profile's display name when Chrome recorded one.
+ */
+export function findClaudeExtension(opts = {}) {
+  const found = [];
+  for (const [browser, dir] of chromeDataDirs(opts)) {
+    let names = {};
+    try { names = JSON.parse(fs.readFileSync(path.join(dir, 'Local State'), 'utf8'))?.profile?.info_cache ?? {}; } catch { /* no Local State */ }
+    let profiles = [];
+    try { profiles = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { continue; }
+    for (const p of profiles) {
+      if (fs.existsSync(path.join(dir, p, 'Extensions', CLAUDE_EXTENSION_ID))) {
+        found.push({ browser, profile: names[p]?.name || p });
+      }
+    }
+  }
+  return found;
 }

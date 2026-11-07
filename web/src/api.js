@@ -33,6 +33,7 @@ export const api = {
   setup: () => request('GET', '/api/setup'),
   installClaude: () => request('POST', '/api/setup/install-claude'),
   loginClaude: () => request('POST', '/api/setup/login'),
+  testChrome: () => request('POST', '/api/setup/test-chrome'),
   settings: () => request('GET', '/api/settings'),
   saveSettings: (s) => request('PUT', '/api/settings', s),
 };
