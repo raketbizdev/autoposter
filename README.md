@@ -24,7 +24,7 @@ Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple S
 | **Lemon Squeezy** | coming soon |
 | **Gumroad** | [Buy on Gumroad](https://raket5.gumroad.com/l/autoposter) |
 
-$39, one-time payment. The first 100 customers get a launch discount code; it's posted on my page.
+$39, one-time payment. The first 100 customers get a launch discount code; it's posted on my Facebook page.
 
 Prefer free? The scheduler is here under the MIT license: see [Run from source](#run-from-source). The desktop app
 (menu bar / tray, auto start, installers) is only in the paid version.
