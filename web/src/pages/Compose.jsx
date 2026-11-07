@@ -129,6 +129,9 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
                   <Checkbox size="small" checked={on} onChange={() => toggle(d.id)} sx={{ p: 0.5 }} />
                   <TypeBadge type={d.type} withLabel={false} />
                   <Typography fontWeight={650} fontSize={14} noWrap sx={{ flex: 1 }}>{d.name}</Typography>
+                  {d.post_as && (
+                    <Typography variant="caption" color="primary.main" fontWeight={650} noWrap sx={{ flex: 'none', maxWidth: 140 }}>as {d.post_as}</Typography>
+                  )}
                   {d.platform !== 'facebook' && (
                     <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 'none' }}>
                       {PLATFORMS[d.platform].label}{d.type !== 'profile' ? ` · ${typeLabel(d.platform, d.type)}` : ''}

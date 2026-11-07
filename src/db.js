@@ -93,6 +93,10 @@ export function openDb(file) {
     });
     db.exec('PRAGMA foreign_keys = ON');
   }
+  // Facebook groups can be posted to as one of the owner's Pages instead of their profile. NULL: as themselves.
+  if (!db.prepare('PRAGMA table_info(destinations)').all().some((c) => c.name === 'post_as')) {
+    db.exec('ALTER TABLE destinations ADD COLUMN post_as TEXT');
+  }
   // "Post now" flag: the next worker pass runs this job first, ignoring the group gap, daily cap and usage pause.
   if (!db.prepare('PRAGMA table_info(jobs)').all().some((c) => c.name === 'force_now')) {
     db.exec('ALTER TABLE jobs ADD COLUMN force_now INTEGER NOT NULL DEFAULT 0');
@@ -132,7 +136,7 @@ export function tx(db, fn) {
 
 export function getJob(db, id) {
   return db.prepare(`
-    SELECT j.*, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url, d.platform AS destination_platform,
+    SELECT j.*, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url, d.platform AS destination_platform, d.post_as AS destination_post_as,
            d.audience AS destination_audience, d.enabled AS destination_enabled, p.body AS post_body
     FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id
     WHERE j.id = ?`).get(id);

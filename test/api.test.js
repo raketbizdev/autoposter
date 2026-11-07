@@ -158,3 +158,17 @@ test('jobs for a removed destination cannot be retried; failed jobs can be remov
   assert.equal((await fetch(`${base}/api/jobs/${live.id}`, { method: 'DELETE' })).status, 409, 'queued jobs are not removable');
   db.prepare("UPDATE jobs SET status = 'cancelled' WHERE id = ?").run(live.id);
 });
+
+test('Facebook groups can be set to post as a Page; other destinations cannot', async () => {
+  const g = await (await json('POST', '/api/destinations', { name: 'G', type: 'group', url: 'https://www.facebook.com/groups/asPage', post_as: '  My Shop  ' })).json();
+  assert.equal(g.post_as, 'My Shop');
+  const cleared = await (await json('PATCH', `/api/destinations/${g.id}`, { post_as: '' })).json();
+  assert.equal(cleared.post_as, null);
+  const set = await (await json('PATCH', `/api/destinations/${g.id}`, { post_as: 'Other Page' })).json();
+  assert.equal(set.post_as, 'Other Page');
+  const kept = await (await json('PATCH', `/api/destinations/${g.id}`, { enabled: false })).json();
+  assert.equal(kept.post_as, 'Other Page', 'other updates keep the choice');
+  const page = await json('POST', '/api/destinations', { name: 'P', type: 'page', url: 'https://www.facebook.com/somePage', post_as: 'X' });
+  assert.equal(page.status, 400);
+  await fetch(`${base}/api/destinations/${g.id}`, { method: 'DELETE' });
+});

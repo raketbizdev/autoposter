@@ -35,8 +35,17 @@ function facebookInstructions(job, settings = {}) {
     ].join('\n');
   }
   const about = settings.join_about || "I'm interested in what this group discusses and want to follow the conversations here.";
+  const page = job.destination_post_as;
+  const asPage = page ? [
+    `POST AS THE PAGE "${page}", NOT as the owner's personal profile.`,
+    `- First switch the group to the Page: look for the identity switcher on the group page (the owner's small profile picture with a ▾ next to the Join/Joined button or the composer, or a line like "You're interacting as …") and choose "${page}".`,
+    `- If there is no switcher, switch the whole account into the Page with Facebook's profile switcher (account menu → See all profiles → "${page}"), reopen ${url}, and after posting switch the account back to the personal profile.`,
+    '- The membership steps below apply to the Page while you are acting as it.',
+    `- Just before clicking Post, check the composer shows "${page}" as the author. If you cannot act as "${page}" in this group (Pages aren't allowed, or the Page isn't listed), do NOT post as the owner instead; report failed with note "Can't post as ${page} in this group".`,
+  ] : [];
   return [
     `Destination: the Facebook GROUP "${job.destination_name}". Open ${url}.`,
+    ...asPage,
     'MEMBERSHIP FIRST. Look at the button under the group name:',
     '- "Joined": the owner is a member. Go on to post.',
     '- "Join group" (or "Join"): join BEFORE posting, even if the group would let a non-member post. Click it once.',

@@ -126,3 +126,12 @@ test('each platform gets its own instructions; Reddit uses the first line as the
   const fb = buildPrompt({ ...base, destination_type: 'group', destination_url: 'https://www.facebook.com/groups/x' }, []);
   assert.match(fb, /ONE Facebook post/, 'jobs without a platform are Facebook');
 });
+
+test('a Facebook group set to post as a Page switches to it and never falls back to the profile', async () => {
+  const { buildPrompt } = await import('../src/prompt.js');
+  const g = { destination_platform: 'facebook', destination_type: 'group', destination_name: 'G', destination_url: 'https://www.facebook.com/groups/g', post_body: 'Hi' };
+  const asPage = buildPrompt({ ...g, destination_post_as: 'My Shop' }, []);
+  assert.match(asPage, /POST AS THE PAGE "My Shop"/);
+  assert.match(asPage, /do NOT post as the owner instead/);
+  assert.doesNotMatch(buildPrompt(g, []), /POST AS THE PAGE/);
+});

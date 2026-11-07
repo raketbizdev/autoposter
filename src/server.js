@@ -12,6 +12,15 @@ import { postedToday } from './worker.js';
 import { cleanPostUrl } from './runner.js';
 
 const AUDIENCES = new Set(['default', 'public', 'friends', 'only_me']);
+
+// "Post as": empty means the person's own profile; otherwise the name of one of their Facebook Pages. Groups only.
+function postAsValue(platform, type, value) {
+  const name = String(value ?? '').trim();
+  if (!name) return null;
+  if (platform !== 'facebook' || type !== 'group') throw new HttpError(400, 'Posting as a Page is only for Facebook groups');
+  if (name.length > 100) throw new HttpError(400, 'The Page name is too long');
+  return name;
+}
 const NUMERIC_SETTINGS = { daily_cap: [1, 200], group_gap_minutes: [0, 1440], max_attempts: [1, 5], job_timeout_min: [3, 60],
   join_recheck_hours: [1, 48], join_wait_days: [1, 60] };
 const MODELS = new Set(['sonnet', 'opus', 'haiku']);
@@ -63,7 +72,7 @@ async function waitFor(check, ms = 5000) {
 
 const JOB_SELECT = `SELECT j.id, j.post_id, j.destination_id, j.scheduled_at, j.status, j.attempts, j.last_error,
   j.post_url, j.started_at, j.finished_at, j.force_now, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
-  d.platform AS destination_platform, d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
+  d.platform AS destination_platform, d.post_as AS destination_post_as, d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
 
 export function createApp(db, p) {
   const app = express();
@@ -80,7 +89,7 @@ export function createApp(db, p) {
   });
 
   app.post('/api/destinations', (req, res) => {
-    const { name, platform = 'facebook', type, url, audience = 'default' } = req.body ?? {};
+    const { name, platform = 'facebook', type, url, audience = 'default', post_as: postAsRaw } = req.body ?? {};
     const pf = PLATFORMS[platform];
     if (!name?.trim()) throw new HttpError(400, 'Name is required');
     if (!pf) throw new HttpError(400, 'Unknown platform');
@@ -88,15 +97,16 @@ export function createApp(db, p) {
     if (!isPlatformUrl(platform, url)) throw new HttpError(400, `URL must be an https://${pf.hosts[0]} link`);
     if (!AUDIENCES.has(audience)) throw new HttpError(400, 'Invalid audience');
     const keepAudience = platform === 'facebook' && type === 'profile';
+    const postAs = postAsValue(platform, type, postAsRaw);
     const existing = db.prepare('SELECT id, archived FROM destinations WHERE url = ?').get(url);
     if (existing && !existing.archived) throw new HttpError(409, 'That destination already exists');
     if (existing) {
-      db.prepare('UPDATE destinations SET name = ?, platform = ?, type = ?, audience = ?, enabled = 1, archived = 0 WHERE id = ?')
-        .run(name.trim(), platform, type, keepAudience ? audience : 'default', existing.id);
+      db.prepare('UPDATE destinations SET name = ?, platform = ?, type = ?, audience = ?, post_as = ?, enabled = 1, archived = 0 WHERE id = ?')
+        .run(name.trim(), platform, type, keepAudience ? audience : 'default', postAs, existing.id);
       return res.status(201).json(db.prepare('SELECT * FROM destinations WHERE id = ?').get(existing.id));
     }
-    const row = db.prepare(`INSERT INTO destinations(name, platform, type, url, audience, created_at) VALUES (?, ?, ?, ?, ?, ?)
-      RETURNING *`).get(name.trim(), platform, type, url, keepAudience ? audience : 'default', nowIso());
+    const row = db.prepare(`INSERT INTO destinations(name, platform, type, url, audience, post_as, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING *`).get(name.trim(), platform, type, url, keepAudience ? audience : 'default', postAs, nowIso());
     res.status(201).json(row);
   });
 
@@ -105,8 +115,9 @@ export function createApp(db, p) {
     if (!d) throw new HttpError(404, 'Destination not found');
     const { name = d.name, enabled = d.enabled, audience = d.audience } = req.body ?? {};
     if (!AUDIENCES.has(audience)) throw new HttpError(400, 'Invalid audience');
-    res.json(db.prepare('UPDATE destinations SET name = ?, enabled = ?, audience = ? WHERE id = ? RETURNING *')
-      .get(String(name).trim() || d.name, enabled ? 1 : 0, audience, d.id));
+    const postAs = req.body && 'post_as' in req.body ? postAsValue(d.platform, d.type, req.body.post_as) : d.post_as;
+    res.json(db.prepare('UPDATE destinations SET name = ?, enabled = ?, audience = ?, post_as = ? WHERE id = ? RETURNING *')
+      .get(String(name).trim() || d.name, enabled ? 1 : 0, audience, postAs, d.id));
   });
 
   // Removing cancels queued jobs. Destinations with history are archived so the log stays intact.

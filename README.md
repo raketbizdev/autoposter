@@ -69,7 +69,7 @@ and attaches them to a GitHub Release.
 
 | Platform | Destinations | Notes |
 |---|---|---|
-| Facebook | Profile, Pages, groups | Joins groups first if needed and answers membership questions. |
+| Facebook | Profile, Pages, groups | Joins groups first if needed and answers membership questions. Each group can post as you or as one of your Pages (**Post as** in Destinations). |
 | LinkedIn | Profile, company Pages, groups | Page posts go out as the Page. |
 | X | Profile | Long text fails unless your account allows it; Claude never shortens it. Up to 4 photos. |
 | Threads | Profile | |

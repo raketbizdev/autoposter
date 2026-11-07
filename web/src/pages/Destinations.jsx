@@ -1,13 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Paper, Stack,
+  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Paper, Stack,
   Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import { ExternalLink, Flag, Link, MapPin, Plus, Trash2, UserRound, UsersRound } from 'lucide-react';
 import { api, AUDIENCE_LABEL, PLATFORMS, typeLabel } from '../api.js';
 import { EmptyState, Panel, TypeBadge } from '../components.jsx';
 
-const EMPTY = { name: '', platform: 'facebook', type: 'group', url: '', audience: 'default' };
+const EMPTY = { name: '', platform: 'facebook', type: 'group', url: '', audience: 'default', post_as: '' };
+const MYSELF = 'Myself';
+
+/**
+ * "Post as" for a Facebook group: the person's own profile or one of their Pages. Suggests the Pages saved in
+ * Destinations; any other Page name can be typed.
+ */
+function PostAsField({ value, pages, onChange, size = 'medium', sx, label }) {
+  const [text, setText] = useState(value || MYSELF);
+  useEffect(() => { setText(value || MYSELF); }, [value]);
+  const commit = (v) => { const name = (v || '').trim(); onChange(name === MYSELF ? '' : name); };
+  return (
+    <Autocomplete freeSolo autoSelect disableClearable size={size} sx={sx}
+      options={[MYSELF, ...pages.filter((p) => p !== MYSELF)]}
+      value={value || MYSELF} inputValue={text}
+      onInputChange={(_, v) => setText(v)}
+      onChange={(_, v) => commit(v)}
+      renderInput={(params) => <TextField {...params} label={label} placeholder="Myself or a Page name" />} />
+  );
+}
 const TYPE_ICON = { profile: UserRound, page: Flag, group: UsersRound };
 const HINT = {
   profile: 'https://www.facebook.com/me works for your own profile.',
@@ -43,6 +62,7 @@ export default function Destinations() {
     ...Object.keys(PLATFORMS).filter((k) => k !== 'facebook').map((k) => [PLATFORMS[k].label, list.filter((d) => d.platform === k)]),
   ].filter(([, l]) => l.length);
   const pf = PLATFORMS[form.platform];
+  const pageNames = list.filter((d) => d.platform === 'facebook' && d.type === 'page').map((d) => d.name);
 
   return (
     <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: '380px 1fr' }, alignItems: 'start' }}>
@@ -71,6 +91,14 @@ export default function Destinations() {
               {Object.entries(AUDIENCE_LABEL).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
             </TextField>
           )}
+          {form.platform === 'facebook' && form.type === 'group' && (
+            <Box>
+              <PostAsField label="Post as" value={form.post_as} pages={pageNames} onChange={(v) => setForm((f) => ({ ...f, post_as: v }))} />
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.75} px={1.75}>
+                Myself, or one of your Pages. Type the Page's name exactly as Facebook shows it. The group has to allow posting as a Page.
+              </Typography>
+            </Box>
+          )}
           {!pf.posting && <Alert severity="info">Saved for later — the scheduler can't post to {pf.label} yet.</Alert>}
           {error && <Alert severity="error">{error}</Alert>}
           <Button type="submit" variant="contained" size="large" startIcon={<Plus size={18} />}>
@@ -79,7 +107,7 @@ export default function Destinations() {
         </Stack>
       </Panel>
 
-      <Stack spacing={2.5}>
+      <Stack spacing={2.5} sx={{ minWidth: 0 }}>
         {!list.length && (
           <Paper><EmptyState icon={MapPin} title="No destinations yet">
             <Typography variant="body2">Add as many profiles, Pages, groups and accounts as you like.</Typography>
@@ -90,14 +118,22 @@ export default function Destinations() {
             {PLATFORMS[items[0].platform].posting ? items.length : `Posting not available yet · ${items.length}`}</Typography>}>
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />}>
               {items.map((d) => (
-                <Stack key={d.id} direction="row" alignItems="center" spacing={1.5} sx={{ py: 1.25, opacity: d.enabled ? 1 : 0.5, transition: 'opacity .2s' }}>
+                <Stack key={d.id} direction="row" alignItems="center" columnGap={1.5} rowGap={1} flexWrap="wrap" useFlexGap
+                  sx={{ py: 1.25, opacity: d.enabled ? 1 : 0.5, transition: 'opacity .2s' }}>
                   <TypeBadge type={d.type} withLabel={false} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ flex: '1 1 180px', minWidth: 0 }}>
                     <Typography fontWeight={700} fontSize={14} noWrap>{d.name}
                       {d.platform !== 'facebook' && d.type !== 'profile' && <Typography component="span" variant="caption" color="text.secondary"> · {typeLabel(d.platform, d.type)}</Typography>}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap component="div">{d.url.replace(/^https:\/\/(www\.)?/, '')}</Typography>
                   </Box>
+                  {d.platform === 'facebook' && d.type === 'group' && (
+                    <Tooltip title="Post in this group as yourself or as one of your Pages" placement="top">
+                      <Box sx={{ width: 200, flex: 'none' }}>
+                        <PostAsField size="small" value={d.post_as} pages={pageNames} onChange={(v) => v !== (d.post_as || '') && update(d.id, { post_as: v })} />
+                      </Box>
+                    </Tooltip>
+                  )}
                   {d.platform === 'facebook' && d.type === 'profile' && (
                     <TextField select size="small" value={d.audience} onChange={(e) => update(d.id, { audience: e.target.value })} sx={{ width: 150 }}>
                       {Object.entries(AUDIENCE_LABEL).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
