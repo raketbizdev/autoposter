@@ -1,5 +1,7 @@
 # Autoposter
 
+![Autoposter](docs/screenshots/cover.png)
+
 A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
 worker runs **Claude Code on your Claude subscription** with the **Claude in Chrome** extension, and Claude
 publishes the post on the website in your signed-in Chrome, the way you would by hand.
@@ -26,6 +28,10 @@ Launch price: **$19 for the first 100 customers**, then $39. One-time payment.
 
 Prefer free? Everything is here under the MIT license: see [Run from source](#run-from-source), or build your own
 installer with `npm run dist:mac` or `npm run dist:win`.
+
+| Calendar | Queue | Destinations |
+|---|---|---|
+| ![Calendar](docs/screenshots/calendar.png) | ![Queue](docs/screenshots/queue.png) | ![Destinations](docs/screenshots/destinations.png) |
 
 ### Installing
 
