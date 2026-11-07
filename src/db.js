@@ -66,6 +66,8 @@ export const DEFAULT_SETTINGS = {
   // The facebook.com/me URL of the only account allowed to post, for when several Chrome browsers are connected.
   // Empty: post from whichever connected browser is signed in to Facebook.
   fb_account_url: '',
+  // '1' after the worker is started from the dashboard, '0' after it is stopped: the desktop app restores it on launch.
+  worker_autostart: '0',
 };
 
 export function openDb(file) {

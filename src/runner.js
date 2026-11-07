@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildPrompt } from './prompt.js';
+import { findClaude, spawnClaude, envWithClaude, killTree } from './platform.js';
 
 // Anything here would switch Claude Code off the subscription login and onto paid API billing.
 const BILLING_ENV = [
@@ -74,7 +74,11 @@ export function looksLikeUsageLimit(text) {
  *   { kind: 'usage_limit', error }    subscription limit hit; nothing was attempted
  *   { kind: 'ambiguous', error, raw } crash, timeout or unreadable output: may or may not have posted
  */
-export async function runJob(job, media, { paths, settings, claudeBin = process.env.CLAUDE_BIN || 'claude' }) {
+export async function runJob(job, media, { paths, settings, claudeBin = findClaude() }) {
+  if (!claudeBin) {
+    return { kind: 'result', raw: null, result: { status: 'failed', clicked_post: false, post_url: null,
+      note: 'Claude Code was not found on this computer. Open Setup in the dashboard to install it.' } };
+  }
   const workDir = path.join(paths.jobs, String(job.id));
   fs.mkdirSync(workDir, { recursive: true });
   const mediaPaths = media.map((m) => {
@@ -88,15 +92,15 @@ export async function runJob(job, media, { paths, settings, claudeBin = process.
   const logFile = path.join(paths.logs, `job-${job.id}-attempt-${job.attempts}.json`);
 
   const { code, stdout, stderr, timedOut } = await new Promise((resolve) => {
-    const child = spawn(claudeBin, buildArgs({ model: settings.model, workDir }), {
+    const child = spawnClaude(claudeBin, buildArgs({ model: settings.model, workDir }), {
       cwd: workDir,
-      env: cleanEnv(),
+      env: cleanEnv(envWithClaude(claudeBin)),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let out = '';
     let err = '';
     let killed = false;
-    const timer = setTimeout(() => { killed = true; child.kill('SIGTERM'); }, timeoutMs);
+    const timer = setTimeout(() => { killed = true; killTree(child); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
     child.on('error', (e) => { err += String(e); });

@@ -12,22 +12,51 @@ publishes the post on facebook.com in your signed-in Chrome, the way you would b
 Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → facebook.com
 ```
 
-## Requirements
+## Download (macOS and Windows)
 
-- macOS, Node 24+, Claude Code logged in with your Claude subscription (`claude auth status` shows `"authMethod": "claude.ai"`)
-- Chrome with the Claude in Chrome extension connected, signed in to Facebook
-- At post time: the Mac is **on, logged in and awake**, and Chrome is **open**
+Get the installer from **[Releases](https://github.com/raketbizdev/autoposter/releases/latest)**:
 
-## Use it
+- **Mac:** `Autoposter-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Open it and drag Autoposter
+  to Applications. The app isn't notarized by Apple yet, so macOS blocks the first open: go to
+  **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
+  `xattr -dr com.apple.quarantine /Applications/Autoposter.app` in Terminal, then open it again.
+- **Windows:** `Autoposter-…-win-x64.exe`. If SmartScreen says "Windows protected your PC", click
+  **More info → Run anyway** (the installer isn't code-signed yet).
+
+Open Autoposter and the **Setup** page walks you through the rest, about 5 minutes, once:
+
+1. **Install Claude Code**: one button runs Anthropic's official installer in a terminal window.
+2. **Log in**: sign in with the Claude account that has your Pro or Max plan. No API key.
+3. **Connect Chrome**: install the [Claude in Chrome](https://claude.ai/chrome) extension and be signed in to Facebook in that Chrome.
+4. **Test post**: post "Only me" to your own profile with **Post now**.
+5. **Start the worker.**
+
+Autoposter then lives in the menu bar (Mac) or system tray (Windows). Closing the window keeps it running so
+scheduled posts still go out; use **Open at login** in its tray menu to start it with your computer. At post time
+the computer must be on and awake (the app keeps it from sleeping while the worker runs) and Chrome must be open.
+Your data stays on your computer, in `~/Library/Application Support/Autoposter` or `%APPDATA%\Autoposter`.
+
+## Run from source
+
+Node 24+ and Claude Code logged in with your Claude subscription (`claude auth status` shows `"authMethod": "claude.ai"`).
 
 ```bash
 npm install
-npm run build                       # build the dashboard
-npm start                           # dashboard at http://127.0.0.1:4317
-bash scripts/install-launchd.sh     # run server + worker now and at every login; launchd restarts them if they die
+npm run app                         # build the dashboard and open the desktop app
 ```
 
-Without launchd you can run them yourself with `npm start` and `npm run worker`. To remove launchd: `bash scripts/uninstall-launchd.sh`.
+Or without the desktop app (data stays in this folder):
+
+```bash
+npm run build && npm start          # dashboard at http://127.0.0.1:4317
+npm run worker                      # in another terminal
+bash scripts/install-launchd.sh     # macOS only: run server + worker at every login and restart them if they die
+```
+
+Build installers with `npm run dist:mac` or `npm run dist:win`. Pushing a `v*` tag builds both on GitHub Actions
+and attaches them to a GitHub Release.
+
+## Use it
 
 1. **Settings:** if more than one Chrome is connected to Claude, set **Facebook account** to the address
    `facebook.com/me` lands on, so only that account posts. Edit how Claude describes you when a group asks
@@ -57,7 +86,7 @@ Without launchd you can run them yourself with `npm start` and `npm run worker`.
 - **Check the terms yourself.** Make sure that running Claude Code unattended on a schedule is allowed by
   your current Claude subscription terms.
 - **Media is capped at 10 MB per post** (a limit of the Chrome extension's file upload), so most phone videos won't fit.
-- If the Mac sleeps, Chrome is closed or Facebook logs you out, posts run late or fail and the dashboard shows it.
+- If the computer sleeps, Chrome is closed or Facebook logs you out, posts run late or fail and the dashboard shows it.
   CAPTCHAs and security checks are never bypassed; the post fails and you handle it.
 - One Facebook login (the one in Chrome). Pages are posted to by switching into the Page.
 
@@ -66,6 +95,7 @@ Without launchd you can run them yourself with `npm start` and `npm run worker`.
 ```bash
 npm test        # node:test, uses a fake claude binary — no Facebook, no usage
 npm run dev     # Vite dev server on :5173, proxying to npm start on :4317
+npm run app     # desktop app (Electron) from source
 ```
 
 Data lives in `data/` (SQLite), `media/` (uploads), `jobs/` (per-run copies) and `logs/` (raw Claude output per run).

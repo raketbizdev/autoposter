@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { paths } from '../src/config.js';
 import { openDb, nowIso } from '../src/db.js';
 
@@ -23,4 +24,4 @@ export function addJob(db, destinationId, scheduledAt, body = 'Hello') {
     .get(post.id, destinationId, scheduledAt.toISOString());
 }
 
-export const FAKE_CLAUDE = new URL('./fake-claude.cjs', import.meta.url).pathname;
+export const FAKE_CLAUDE = fileURLToPath(new URL(process.platform === 'win32' ? './fake-claude.cmd' : './fake-claude.cjs', import.meta.url));

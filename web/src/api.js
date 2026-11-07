@@ -30,6 +30,9 @@ export const api = {
   stopWorker: () => request('POST', '/api/worker/stop'),
   // Served by the Vite dev server (web/vite.config.js), since a dead API server can't restart itself.
   restartServer: () => request('POST', '/__dev/restart-server'),
+  setup: () => request('GET', '/api/setup'),
+  installClaude: () => request('POST', '/api/setup/install-claude'),
+  loginClaude: () => request('POST', '/api/setup/login'),
   settings: () => request('GET', '/api/settings'),
   saveSettings: (s) => request('PUT', '/api/settings', s),
 };

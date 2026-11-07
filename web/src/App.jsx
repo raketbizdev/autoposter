@@ -3,7 +3,7 @@ import {
   Badge, Box, Button, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
   Stack, Typography, useMediaQuery,
 } from '@mui/material';
-import { CalendarDays, LayoutDashboard, RotateCw, ListChecks, MapPin, Menu, Plus, Send, Settings as SettingsIcon, SquarePen } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Rocket, RotateCw, ListChecks, MapPin, Menu, Plus, Send, Settings as SettingsIcon, SquarePen } from 'lucide-react';
 import { api, formatWhen } from './api.js';
 import { tokens } from './theme.js';
 import { WorkerControl } from './components.jsx';
@@ -13,8 +13,11 @@ import Compose from './pages/Compose.jsx';
 import Queue from './pages/Queue.jsx';
 import Destinations from './pages/Destinations.jsx';
 import Settings from './pages/Settings.jsx';
+import Setup, { setupReady } from './pages/Setup.jsx';
 
 const DRAWER = 252;
+// Read before the app writes its own hash, so a first visit with no page in the URL can open Setup.
+const INITIAL_HASH = location.hash.slice(1);
 
 const PAGES = [
   { key: 'overview', label: 'Dashboard', subtitle: 'Today at a glance', icon: LayoutDashboard },
@@ -23,6 +26,7 @@ const PAGES = [
   { key: 'queue', label: 'Queue', subtitle: 'Every scheduled post and how it went', icon: ListChecks },
   { key: 'destinations', label: 'Destinations', subtitle: 'Your profile, Pages and groups', icon: MapPin },
   { key: 'settings', label: 'Settings', subtitle: 'Pacing, limits and the Claude model', icon: SettingsIcon },
+  { key: 'setup', label: 'Setup', subtitle: 'Connect Claude Code and Chrome, once', icon: Rocket },
 ];
 
 function RestartServer() {
@@ -89,7 +93,7 @@ function WorkerCard({ status, onChange }) {
   );
 }
 
-function Sidebar({ page, go, status, onStatusChange }) {
+function Sidebar({ page, go, status, onStatusChange, setupDone }) {
   const needsCheck = status?.counts?.needs_check || 0;
   return (
     <Stack sx={{ height: '100%', bgcolor: tokens.ink, color: '#fff', p: 2, gap: 3 }}>
@@ -122,6 +126,7 @@ function Sidebar({ page, go, status, onStatusChange }) {
                 <ListItemIcon sx={{ minWidth: 34, color: active ? 'primary.main' : 'inherit' }}><Icon size={18} /></ListItemIcon>
                 <ListItemText primary={label} slotProps={{ primary: { fontWeight: active ? 700 : 550, fontSize: 14 } }} />
                 {key === 'queue' && needsCheck > 0 && <Badge badgeContent={needsCheck} color="warning" sx={{ mr: 1 }} />}
+                {key === 'setup' && setupDone === false && <Badge variant="dot" color="primary" sx={{ mr: 1.5 }} />}
               </ListItemButton>
             );
           })}
@@ -141,6 +146,14 @@ export default function App() {
   const [status, setStatus] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [composeWhen, setComposeWhen] = useState(null);
+  const [setup, setSetup] = useState(null);
+  // First run: open Setup until Claude Code is installed and logged in with a subscription.
+  useEffect(() => {
+    api.setup().then((s) => {
+      setSetup(s);
+      if (!setupReady(s) && !INITIAL_HASH) setPage('setup');
+    }).catch(() => {});
+  }, []);
   const desktop = useMediaQuery((t) => t.breakpoints.up('md'));
 
   const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => setStatus(null)), []);
@@ -162,7 +175,7 @@ export default function App() {
   const go = (key) => { if (key === 'compose') setComposeWhen(null); setPage(key); setMobileOpen(false); };
   const composeAt = (date) => { setComposeWhen(date); setPage('compose'); };
   const current = PAGES.find((p) => p.key === page);
-  const sidebar = <Sidebar page={page} go={go} status={status} onStatusChange={refreshStatus} />;
+  const sidebar = <Sidebar page={page} go={go} status={status} onStatusChange={refreshStatus} setupDone={setup ? setupReady(setup) : undefined} />;
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -193,6 +206,7 @@ export default function App() {
             {page === 'queue' && <Queue onChange={refreshStatus} />}
             {page === 'destinations' && <Destinations />}
             {page === 'settings' && <Settings onChange={refreshStatus} />}
+            {page === 'setup' && <Setup status={status} onStatusChange={refreshStatus} go={go} onSetupChange={setSetup} />}
           </Box>
         </Box>
       </Box>

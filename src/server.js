@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawnNodeScript, findClaude, claudeAuthStatus, openTerminal, CLAUDE_INSTALL_COMMAND, claudeLoginCommand, IN_ELECTRON } from './platform.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { paths as getPaths, PORT, HOST, LIMITS } from './config.js';
@@ -30,7 +30,7 @@ function mediaKind(mimetype) {
   return null;
 }
 
-function workerPid(lockFile) {
+export function workerPid(lockFile) {
   try {
     const pid = Number(fs.readFileSync(lockFile, 'utf8'));
     process.kill(pid, 0);
@@ -46,14 +46,10 @@ function workerAlive(lockFile) {
 
 const LAUNCHD_PLIST = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.autoposter.worker.plist');
 
-// Starts the worker as its own detached process (kept awake by caffeinate), so it outlives a dashboard restart.
-function startWorker(p) {
-  const log = fs.openSync(path.join(p.logs, 'worker.log'), 'a');
-  const child = spawn('/usr/bin/caffeinate',
-    ['-i', process.execPath, '--disable-warning=ExperimentalWarning', path.join(p.root, 'src', 'worker.js')],
-    { cwd: p.root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, AUTOPOSTER_HOME: p.home } });
-  child.unref();
-  fs.closeSync(log);
+// Starts the worker as its own detached process, so it outlives a dashboard restart.
+export function startWorker(p, args = []) {
+  spawnNodeScript(path.join(p.root, 'src', 'worker.js'), args,
+    { cwd: p.root, logFile: path.join(p.logs, 'worker.log'), env: { AUTOPOSTER_HOME: p.home } });
 }
 
 async function waitFor(check, ms = 5000) {
@@ -241,14 +237,8 @@ export function createApp(db, p) {
     const row = db.prepare(`UPDATE jobs SET force_now = 1, last_error = NULL WHERE id = ? AND status IN ('queued','awaiting_join')
       RETURNING id, status`).get(req.params.id);
     if (!row) throw new HttpError(409, 'Only queued or waiting-to-join posts can be posted now');
-    if (pid) {
-      process.kill(pid, 'SIGUSR1'); // the worker runs it next, right after any post it is publishing now
-    } else {
-      const log = fs.openSync(path.join(p.logs, 'worker.log'), 'a');
-      spawn('/usr/bin/caffeinate', ['-i', process.execPath, '--disable-warning=ExperimentalWarning', path.join(p.root, 'src', 'worker.js'), '--post-now'],
-        { cwd: p.root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, AUTOPOSTER_HOME: p.home } }).unref();
-      fs.closeSync(log);
-    }
+    // A running worker sees the flag within a few seconds, right after any post it is publishing now.
+    if (!pid) startWorker(p, ['--post-now']);
     res.json({ ...row, via: pid ? 'worker' : 'one-off' });
   });
   // Clears a failed or cancelled job from the Queue. Posted and pending jobs stay as history.
@@ -271,6 +261,7 @@ export function createApp(db, p) {
   app.post('/api/worker/start', async (req, res) => {
     if (workerAlive(p.lock)) throw new HttpError(409, 'The worker is already running');
     startWorker(p);
+    setSetting(db, 'worker_autostart', '1');
     if (!(await waitFor(() => workerAlive(p.lock)))) {
       throw new HttpError(503, 'The worker did not start; see logs/worker.log');
     }
@@ -278,14 +269,43 @@ export function createApp(db, p) {
   });
 
   app.post('/api/worker/stop', async (req, res) => {
-    if (fs.existsSync(LAUNCHD_PLIST) && !process.env.AUTOPOSTER_HOME) {
+    if (!IN_ELECTRON && fs.existsSync(LAUNCHD_PLIST) && !process.env.AUTOPOSTER_HOME) {
       throw new HttpError(409, 'The worker is managed by launchd and would restart. Run bash scripts/uninstall-launchd.sh to stop it.');
     }
     const pid = workerPid(p.lock);
     if (!pid) throw new HttpError(409, 'The worker is not running');
     process.kill(pid, 'SIGTERM');
+    setSetting(db, 'worker_autostart', '0');
     await waitFor(() => !workerAlive(p.lock));
     res.json({ worker_running: workerAlive(p.lock) });
+  });
+
+  // ---- first-run setup: Claude Code installed and logged in with a Claude subscription
+  app.get('/api/setup', (req, res) => {
+    const bin = findClaude();
+    const auth = claudeAuthStatus(bin);
+    res.json({
+      platform: process.platform,
+      app: IN_ELECTRON,
+      claude_path: bin,
+      claude_installed: Boolean(bin),
+      logged_in: Boolean(auth?.loggedIn),
+      // 'claude.ai' is the subscription login; anything else would bill API usage.
+      subscription: auth?.authMethod === 'claude.ai',
+      auth_method: auth?.authMethod ?? null,
+      email: auth?.email ?? null,
+    });
+  });
+  // Both open a terminal window: the installer and the browser login need the person, not the app.
+  app.post('/api/setup/install-claude', (req, res) => {
+    openTerminal(CLAUDE_INSTALL_COMMAND);
+    res.json({ opened: true });
+  });
+  app.post('/api/setup/login', (req, res) => {
+    const bin = findClaude();
+    if (!bin) throw new HttpError(409, 'Install Claude Code first');
+    openTerminal(claudeLoginCommand(bin));
+    res.json({ opened: true });
   });
 
   // ---- settings & status
@@ -327,7 +347,7 @@ export function createApp(db, p) {
       .map((r) => [r.status, r.n]));
     res.json({
       worker_running: workerAlive(p.lock),
-      worker_launchd: fs.existsSync(LAUNCHD_PLIST),
+      worker_launchd: !IN_ELECTRON && fs.existsSync(LAUNCHD_PLIST),
       overdue: db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status = 'queued' AND scheduled_at <= ?").get(nowIso()).n,
       paused_until: settings.paused_until || null,
       posted_today: postedToday(db, new Date()),

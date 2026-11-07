@@ -188,7 +188,8 @@ async function main() {
   };
   await loop();
   setInterval(loop, 60_000);
-  process.on('SIGUSR1', loop); // the server's "Post now" wakes the worker instead of waiting for the next minute
+  // "Post now" sets a flag in the database; checking it every few seconds works the same on macOS and Windows.
+  setInterval(() => { if (!busy && forcedJob(db) !== null) loop(); }, 5_000);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

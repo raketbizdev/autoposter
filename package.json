@@ -2,29 +2,102 @@
   "name": "autoposter",
   "version": "1.0.0",
   "private": true,
-  "description": "Local Facebook post scheduler that publishes through Claude Code + Chrome on your Claude subscription",
+  "description": "Schedule Facebook posts; Claude Code publishes them in your own Chrome on your Claude subscription. macOS and Windows.",
   "type": "module",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "worker": "node --disable-warning=ExperimentalWarning src/worker.js",
     "dev": "vite --config web/vite.config.js",
     "build": "vite build --config web/vite.config.js",
-    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.js'"
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
+    "app": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "express": "^5.3.0",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/manrope": "^5.3.0",
     "@mui/material": "^7.3.11",
-    "express": "^5.3.0",
-    "lucide-react": "^1.67.0",
-    "multer": "^2.5.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "lucide-react": "^1.67.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "vite": "^6.4.5"
+  },
+  "productName": "Autoposter",
+  "author": "Ruel Nopal",
+  "license": "MIT",
+  "homepage": "https://github.com/raketbizdev/autoposter",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raketbizdev/autoposter.git"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.raketbizdev.autoposter",
+    "productName": "Autoposter",
+    "artifactName": "Autoposter-${version}-${os}-${arch}.${ext}",
+    "asar": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "src/**",
+      "web/dist/**",
+      "package.json",
+      "LICENSE",
+      "!**/*.map"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "Autoposter"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "raketbizdev",
+        "repo": "autoposter",
+        "releaseType": "release"
+      }
+    ]
   }
 }
