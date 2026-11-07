@@ -26,8 +26,8 @@ Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple S
 
 Launch price: **$19 for the first 100 customers**, then $39. One-time payment.
 
-Prefer free? Everything is here under the MIT license: see [Run from source](#run-from-source), or build your own
-installer with `npm run dist:mac` or `npm run dist:win`.
+Prefer free? The scheduler is here under the MIT license: see [Run from source](#run-from-source). The desktop app
+(menu bar / tray, auto start, installers) is only in the paid version.
 
 | Calendar | Queue | Destinations |
 |---|---|---|
@@ -60,18 +60,10 @@ Node 24+ and Claude Code logged in with your Claude subscription (`claude auth s
 
 ```bash
 npm install
-npm run app                         # build the dashboard and open the desktop app
-```
-
-Or without the desktop app (data stays in this folder):
-
-```bash
 npm run build && npm start          # dashboard at http://127.0.0.1:4317
 npm run worker                      # in another terminal
 bash scripts/install-launchd.sh     # macOS only: run server + worker at every login and restart them if they die
 ```
-
-Build installers with `npm run dist:mac` or `npm run dist:win` (they land in `release/`).
 
 ## Use it
 
@@ -126,7 +118,6 @@ Chrome must be signed in to each account you post to. The group gap applies betw
 ```bash
 npm test        # node:test, uses a fake claude binary — no Facebook, no usage
 npm run dev     # Vite dev server on :5173, proxying to npm start on :4317
-npm run app     # desktop app (Electron) from source
 ```
 
 Data lives in `data/` (SQLite), `media/` (uploads), `jobs/` (per-run copies) and `logs/` (raw Claude output per run).
