@@ -22,7 +22,7 @@ Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple S
 | Store | Link |
 |---|---|
 | **Lemon Squeezy** | coming soon |
-| **Gumroad** | coming soon |
+| **Gumroad** | [Buy on Gumroad](https://raket5.gumroad.com/l/autoposter/LAUNCH) (launch price applied) |
 
 Launch price: **$19 for the first 100 customers**, then $39. One-time payment.
 
