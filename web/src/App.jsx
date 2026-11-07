@@ -1,0 +1,201 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Badge, Box, Button, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
+  Stack, Typography, useMediaQuery,
+} from '@mui/material';
+import { CalendarDays, LayoutDashboard, RotateCw, ListChecks, MapPin, Menu, Plus, Send, Settings as SettingsIcon, SquarePen } from 'lucide-react';
+import { api, formatWhen } from './api.js';
+import { tokens } from './theme.js';
+import { WorkerControl } from './components.jsx';
+import Overview from './pages/Overview.jsx';
+import Calendar from './pages/Calendar.jsx';
+import Compose from './pages/Compose.jsx';
+import Queue from './pages/Queue.jsx';
+import Destinations from './pages/Destinations.jsx';
+import Settings from './pages/Settings.jsx';
+
+const DRAWER = 252;
+
+const PAGES = [
+  { key: 'overview', label: 'Dashboard', subtitle: 'Today at a glance', icon: LayoutDashboard },
+  { key: 'calendar', label: 'Calendar', subtitle: 'Your posting plan, day by day', icon: CalendarDays },
+  { key: 'compose', label: 'Compose', subtitle: 'Write once, schedule everywhere', icon: SquarePen },
+  { key: 'queue', label: 'Queue', subtitle: 'Every scheduled post and how it went', icon: ListChecks },
+  { key: 'destinations', label: 'Destinations', subtitle: 'Your profile, Pages and groups', icon: MapPin },
+  { key: 'settings', label: 'Settings', subtitle: 'Pacing, limits and the Claude model', icon: SettingsIcon },
+];
+
+function RestartServer() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function restart() {
+    setBusy(true);
+    setError('');
+    try { await api.restartServer(); location.reload(); } catch (e) { setError(e.message); setBusy(false); }
+  }
+  return (
+    <Box mt={1.75}>
+      <Button size="small" variant="contained" fullWidth disabled={busy} onClick={restart}
+        startIcon={<RotateCw size={15} className={busy ? 'spin' : undefined} />}>
+        {busy ? 'Restarting…' : 'Restart server'}
+      </Button>
+      {error && <Typography variant="caption" sx={{ color: '#FF6B5B', display: 'block', mt: 0.75 }}>{error}</Typography>}
+    </Box>
+  );
+}
+
+function WorkerCard({ status, onChange }) {
+  const running = status?.worker_running;
+  const paused = status?.paused_until && new Date(status.paused_until) > new Date();
+  const pct = status ? Math.min(100, (status.posted_today / status.daily_cap) * 100) : 0;
+  return (
+    <Box sx={{ p: 2, borderRadius: 3, bgcolor: tokens.inkSoft, border: '1px solid #2E323B' }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Box className={running ? 'pulse' : undefined}
+          sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: !status ? tokens.inkMuted : running ? '#3DDC84' : '#FF6B5B' }} />
+        <Typography variant="body2" fontWeight={700} color="#fff">
+          {!status ? 'Server unreachable' : running ? 'Worker running' : 'Worker stopped'}
+        </Typography>
+      </Stack>
+      {!status && <RestartServer />}
+      {status && !running && (
+        <Typography variant="caption" sx={{ color: tokens.inkMuted, display: 'block', mt: 0.5 }}>
+          Scheduled posts won't go out
+        </Typography>
+      )}
+      {paused && (
+        <Typography variant="caption" sx={{ color: '#FFB547', display: 'block', mt: 0.5 }}>
+          Paused until {formatWhen(status.paused_until)}
+        </Typography>
+      )}
+      {status && (
+        <Box mt={1.75}>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="caption" sx={{ color: tokens.inkMuted }}>Posted today</Typography>
+            <Typography variant="caption" fontWeight={700} color="#fff">{status.posted_today} / {status.daily_cap}</Typography>
+          </Stack>
+          <Box sx={{ mt: 0.75, height: 5, borderRadius: 3, bgcolor: '#353945', overflow: 'hidden' }}>
+            <Box sx={{ width: `${pct}%`, height: '100%', bgcolor: 'primary.main', transition: 'width .4s' }} />
+          </Box>
+        </Box>
+      )}
+      {status && !status.worker_launchd && (
+        <Box mt={1.75}>
+          <WorkerControl status={status} onChange={onChange} size="small"
+            sx={{ width: '100%', ...(status.worker_running ? { color: '#B6BAC4', borderColor: '#3A3E48' } : {}) }} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function Sidebar({ page, go, status, onStatusChange }) {
+  const needsCheck = status?.counts?.needs_check || 0;
+  return (
+    <Stack sx={{ height: '100%', bgcolor: tokens.ink, color: '#fff', p: 2, gap: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1, pt: 0.5 }}>
+        <Box sx={{ width: 34, height: 34, borderRadius: '10px', bgcolor: 'primary.main', display: 'grid', placeItems: 'center',
+          boxShadow: '0 8px 20px -8px rgba(255,91,31,.8)' }}>
+          <Send size={17} color="#fff" />
+        </Box>
+        <Box>
+          <Typography sx={{ fontFamily: '"Bricolage Grotesque Variable"', fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>Autoposter</Typography>
+          <Typography variant="caption" sx={{ color: tokens.inkMuted }}>Facebook scheduler</Typography>
+        </Box>
+      </Stack>
+
+      <Box>
+        <Typography variant="overline" sx={{ color: tokens.inkMuted, px: 1.5 }}>Workspace</Typography>
+        <List dense disablePadding sx={{ mt: 0.5 }}>
+          {PAGES.map(({ key, label, icon: Icon }) => {
+            const active = page === key;
+            return (
+              <ListItemButton key={key} selected={active} onClick={() => go(key)}
+                sx={{
+                  mb: 0.5, py: 1, color: active ? '#fff' : '#B6BAC4',
+                  '&:hover': { bgcolor: tokens.inkSoft, color: '#fff' },
+                  '&.Mui-selected, &.Mui-selected:hover': { bgcolor: tokens.inkSoft, color: '#fff' },
+                  position: 'relative',
+                  '&::before': active ? { content: '""', position: 'absolute', left: -16, top: 8, bottom: 8, width: 3,
+                    borderRadius: 3, bgcolor: 'primary.main' } : undefined,
+                }}>
+                <ListItemIcon sx={{ minWidth: 34, color: active ? 'primary.main' : 'inherit' }}><Icon size={18} /></ListItemIcon>
+                <ListItemText primary={label} slotProps={{ primary: { fontWeight: active ? 700 : 550, fontSize: 14 } }} />
+                {key === 'queue' && needsCheck > 0 && <Badge badgeContent={needsCheck} color="warning" sx={{ mr: 1 }} />}
+              </ListItemButton>
+            );
+          })}
+        </List>
+      </Box>
+
+      <Box sx={{ mt: 'auto' }}><WorkerCard status={status} onChange={onStatusChange} /></Box>
+    </Stack>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState(() => {
+    const h = location.hash.slice(1);
+    return PAGES.some((p) => p.key === h) ? h : 'overview';
+  });
+  const [status, setStatus] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [composeWhen, setComposeWhen] = useState(null);
+  const desktop = useMediaQuery((t) => t.breakpoints.up('md'));
+
+  const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => setStatus(null)), []);
+  useEffect(() => {
+    refreshStatus();
+    const t = setInterval(refreshStatus, 10_000);
+    return () => clearInterval(t);
+  }, [refreshStatus]);
+  useEffect(() => { location.hash = page; }, [page]);
+  useEffect(() => {
+    const onHash = () => {
+      const h = location.hash.slice(1);
+      if (PAGES.some((p) => p.key === h)) setPage(h);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const go = (key) => { if (key === 'compose') setComposeWhen(null); setPage(key); setMobileOpen(false); };
+  const composeAt = (date) => { setComposeWhen(date); setPage('compose'); };
+  const current = PAGES.find((p) => p.key === page);
+  const sidebar = <Sidebar page={page} go={go} status={status} onStatusChange={refreshStatus} />;
+
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {desktop ? (
+        <Box component="nav" sx={{ width: DRAWER, flex: 'none', position: 'sticky', top: 0, height: '100vh' }}>{sidebar}</Box>
+      ) : (
+        <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}
+          slotProps={{ paper: { sx: { width: DRAWER, border: 0, bgcolor: tokens.ink } } }}>{sidebar}</Drawer>
+      )}
+
+      <Box component="main" className="canvas" sx={{ flex: 1, minWidth: 0, px: { xs: 2, md: 5 }, pb: 6 }}>
+        <Box sx={{ maxWidth: 1440, mx: 'auto' }}>
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ pt: { xs: 2.5, md: 4 }, pb: 3 }}>
+            {!desktop && <IconButton onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={20} /></IconButton>}
+            <Box sx={{ flex: 1, minWidth: 0 }} key={page} className="rise">
+              <Typography variant="h1">{current.label}</Typography>
+              <Typography color="text.secondary" mt={0.25}>{current.subtitle}</Typography>
+            </Box>
+            {page !== 'compose' && (
+              <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => go('compose')}>New post</Button>
+            )}
+          </Stack>
+
+          <Box key={page} className="rise" sx={{ animationDelay: '60ms' }}>
+            {page === 'overview' && <Overview status={status} go={go} onStatusChange={refreshStatus} />}
+            {page === 'calendar' && <Calendar onAdd={composeAt} />}
+            {page === 'compose' && <Compose initialWhen={composeWhen} onScheduled={() => { refreshStatus(); go('calendar'); }} goDestinations={() => go('destinations')} />}
+            {page === 'queue' && <Queue onChange={refreshStatus} />}
+            {page === 'destinations' && <Destinations />}
+            {page === 'settings' && <Settings onChange={refreshStatus} />}
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}

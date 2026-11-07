@@ -1,0 +1,174 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { setup, addDestination, addJob } from './helpers.js';
+import { tick, claimNext } from '../src/worker.js';
+import { getSettings, setSetting } from '../src/db.js';
+
+const T0 = new Date('2026-11-03T10:00:00Z');
+const at = (min) => new Date(T0.getTime() + min * 60_000);
+const fakeRun = (outcome) => async () => outcome;
+const ok = { kind: 'result', result: { status: 'submitted', clicked_post: true, post_url: null, note: '' } };
+const status = (db, id) => db.prepare('SELECT status FROM jobs WHERE id = ?').get(id).status;
+
+test('only due jobs run; future jobs wait', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db);
+  const future = addJob(db, d.id, at(30));
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'idle');
+  assert.equal(status(db, future.id), 'queued');
+});
+
+test('a job can only be claimed once', () => {
+  const { db } = setup();
+  const d = addDestination(db);
+  addJob(db, d.id, T0);
+  const s = getSettings(db);
+  assert.ok(claimNext(db, s, T0));
+  assert.equal(claimNext(db, s, T0), null);
+});
+
+test('group posts are spaced by group_gap_minutes; pages are not', async () => {
+  const { db, p } = setup();
+  const g1 = addDestination(db, { name: 'G1', type: 'group' });
+  const g2 = addDestination(db, { name: 'G2', type: 'group' });
+  const pg = addDestination(db, { name: 'P', type: 'page' });
+  const j1 = addJob(db, g1.id, T0);
+  const j2 = addJob(db, g2.id, T0);
+  const j3 = addJob(db, pg.id, T0);
+  const opts = (now) => ({ paths: p, runJob: fakeRun(ok), now: () => now });
+  assert.equal((await tick(db, opts(T0))).jobId, j1.id);
+  assert.equal((await tick(db, opts(at(1)))).jobId, j3.id, 'page runs while group is blocked');
+  assert.equal((await tick(db, opts(at(5)))).action, 'idle');
+  assert.equal((await tick(db, opts(at(20)))).jobId, j2.id);
+});
+
+test('daily cap stops further runs', async () => {
+  const { db, p } = setup();
+  setSetting(db, 'daily_cap', 1);
+  const d1 = addDestination(db);
+  const d2 = addDestination(db);
+  addJob(db, d1.id, T0);
+  const j2 = addJob(db, d2.id, T0);
+  await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 });
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(1) })).action, 'daily_cap');
+  assert.equal(status(db, j2.id), 'queued');
+});
+
+test('failed before clicking Post retries once, then fails', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db);
+  const j = addJob(db, d.id, T0);
+  const fail = fakeRun({ kind: 'result', result: { status: 'failed', clicked_post: false, post_url: null, note: 'login wall' } });
+  assert.equal((await tick(db, { paths: p, runJob: fail, now: () => T0 })).status, 'queued');
+  assert.equal((await tick(db, { paths: p, runJob: fail, now: () => at(5) })).action, 'idle', 'backoff');
+  assert.equal((await tick(db, { paths: p, runJob: fail, now: () => at(10) })).status, 'failed');
+  assert.equal(status(db, j.id), 'failed');
+});
+
+test('failed after clicking Post, ambiguous output and crashes become needs_check (no auto retry)', async () => {
+  for (const outcome of [
+    { kind: 'result', result: { status: 'failed', clicked_post: true, post_url: null, note: 'x' } },
+    { kind: 'ambiguous', error: 'garbage' },
+  ]) {
+    const { db, p } = setup();
+    const d = addDestination(db);
+    const j = addJob(db, d.id, T0);
+    await tick(db, { paths: p, runJob: fakeRun(outcome), now: () => T0 });
+    assert.equal(status(db, j.id), 'needs_check');
+    assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(60) })).action, 'idle');
+  }
+  const { db, p } = setup();
+  const d = addDestination(db);
+  const j = addJob(db, d.id, T0);
+  await tick(db, { paths: p, runJob: async () => { throw new Error('spawn ENOENT'); }, now: () => T0 });
+  assert.equal(status(db, j.id), 'needs_check');
+});
+
+test('usage limit requeues the job and pauses the worker', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db);
+  const j = addJob(db, d.id, T0);
+  await tick(db, { paths: p, runJob: fakeRun({ kind: 'usage_limit', error: 'limit' }), now: () => T0 });
+  assert.equal(status(db, j.id), 'queued');
+  assert.equal(db.prepare('SELECT attempts FROM jobs WHERE id = ?').get(j.id).attempts, 0);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(30) })).action, 'paused');
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(61) })).status, 'submitted');
+});
+
+test('stale running jobs become needs_check', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db);
+  const j = addJob(db, d.id, T0);
+  db.prepare("UPDATE jobs SET status = 'running', started_at = ? WHERE id = ?").run(T0.toISOString(), j.id);
+  await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(30) });
+  assert.equal(status(db, j.id), 'needs_check');
+});
+
+test('non-Facebook destinations are never claimed', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db);
+  db.prepare("UPDATE destinations SET platform = 'reddit' WHERE id = ?").run(d.id);
+  const j = addJob(db, d.id, T0);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'idle');
+  assert.equal(status(db, j.id), 'queued');
+});
+
+test('disabled destinations are skipped but keep their jobs', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db, { enabled: 0 });
+  const j = addJob(db, d.id, T0);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'idle');
+  assert.equal(status(db, j.id), 'queued');
+});
+
+const awaiting = { kind: 'result', result: { status: 'awaiting_join', clicked_post: false, post_url: null, note: 'Join request sent' } };
+const row = (db, id) => db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+
+test('a pending join request waits, rechecks in daytime, keeps its retry, then posts', async () => {
+  const { db, p } = setup();
+  const g = addDestination(db, { name: 'G', type: 'group' });
+  const j = addJob(db, g.id, T0);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(awaiting), now: () => T0 })).status, 'awaiting_join');
+  const r = row(db, j.id);
+  assert.equal(r.status, 'awaiting_join');
+  assert.equal(r.attempts, 0, 'a recheck is not a failed attempt');
+  assert.equal(r.join_requested_at, T0.toISOString());
+  const next = new Date(r.scheduled_at);
+  assert.ok(next.getTime() >= T0.getTime() + 6 * 3_600_000);
+  assert.ok(next.getHours() >= 7 && next.getHours() < 22, 'never rechecks at night');
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(60) })).action, 'idle', 'not before the recheck time');
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => next })).status, 'submitted');
+});
+
+test('a join request that is never accepted fails after join_wait_days', async () => {
+  const { db, p } = setup();
+  setSetting(db, 'join_wait_days', 2);
+  const g = addDestination(db, { name: 'G', type: 'group' });
+  const j = addJob(db, g.id, T0);
+  await tick(db, { paths: p, runJob: fakeRun(awaiting), now: () => T0 });
+  const later = new Date(T0.getTime() + 3 * 86_400_000);
+  db.prepare('UPDATE jobs SET scheduled_at = ? WHERE id = ?').run(later.toISOString(), j.id);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(awaiting), now: () => later })).status, 'failed');
+  assert.match(row(db, j.id).last_error, /hasn't accepted the join request/);
+});
+
+test('"Post now" runs a future job first, ignoring the group gap, daily cap and usage pause', async () => {
+  const { db, p } = setup();
+  setSetting(db, 'daily_cap', 1);
+  const g1 = addDestination(db, { name: 'G1', type: 'group' });
+  const g2 = addDestination(db, { name: 'G2', type: 'group' });
+  const g3 = addDestination(db, { name: 'G3', type: 'group' });
+  addJob(db, g1.id, T0);
+  const due = addJob(db, g2.id, T0);
+  const later = addJob(db, g3.id, at(600));
+  const opts = (now) => ({ paths: p, runJob: fakeRun(ok), now: () => now });
+  await tick(db, opts(T0)); // uses the daily cap and starts the group gap
+  setSetting(db, 'paused_until', at(60).toISOString());
+  db.prepare('UPDATE jobs SET force_now = 1 WHERE id = ?').run(later.id);
+  const r = await tick(db, opts(at(1)));
+  assert.equal(r.jobId, later.id);
+  assert.equal(status(db, later.id), 'submitted');
+  assert.equal(db.prepare('SELECT force_now FROM jobs WHERE id = ?').get(later.id).force_now, 0);
+  assert.equal((await tick(db, opts(at(2)))).action, 'paused', 'the override is one-shot');
+  assert.equal(status(db, due.id), 'queued');
+});

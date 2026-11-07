@@ -1,0 +1,105 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { setup, FAKE_CLAUDE } from './helpers.js';
+import { runJob, parseResultBlock, buildArgs, cleanEnv, cleanPostUrl } from '../src/runner.js';
+
+const job = { id: 1, attempts: 1, destination_type: 'group', destination_name: 'Test Group',
+  destination_url: 'https://www.facebook.com/groups/x', destination_audience: 'default', post_body: 'Hi there' };
+
+async function run(mode, extra = {}) {
+  const { p } = setup();
+  process.env.FAKE_MODE = mode;
+  return runJob(job, extra.media ?? [], { paths: p, settings: { model: 'sonnet', job_timeout_min: extra.timeout ?? 1 }, claudeBin: FAKE_CLAUDE });
+}
+
+test('parseResultBlock takes the last valid block and rejects bad ones', () => {
+  assert.equal(parseResultBlock('no block'), null);
+  assert.equal(parseResultBlock('```json\n{bad\n```'), null);
+  assert.equal(parseResultBlock('```json\n{"status":"live","clicked_post":true}\n```'), null);
+  assert.equal(parseResultBlock('```json\n{"status":"submitted"}\n```'), null, 'clicked_post required');
+  const r = parseResultBlock('```json\n{"status":"failed","clicked_post":false}\n```\n```json\n{"status":"submitted","clicked_post":true,"note":"x"}\n```');
+  assert.deepEqual(r, { status: 'submitted', clicked_post: true, post_url: null, note: 'x' });
+});
+
+test('args never use --bare and only allow Chrome tools', () => {
+  const args = buildArgs({ model: 'sonnet', workDir: '/w' });
+  assert.ok(!args.includes('--bare'));
+  assert.ok(args.includes('--chrome') && args.includes('-p'));
+  assert.equal(args[args.indexOf('--allowedTools') + 1], 'mcp__claude-in-chrome__*');
+  for (const t of ['Bash', 'Edit', 'Write', 'WebFetch']) assert.ok(args.includes(t));
+});
+
+test('billing env vars are stripped from the child', () => {
+  const env = cleanEnv({ ANTHROPIC_API_KEY: 'x', CLAUDE_CODE_USE_BEDROCK: '1', HOME: '/h' });
+  assert.deepEqual(env, { HOME: '/h' });
+});
+
+test('success, pending and failed outcomes', async () => {
+  assert.equal((await run('success')).result.status, 'submitted');
+  assert.equal((await run('pending')).result.status, 'pending_approval');
+  const f = await run('failed_before');
+  assert.equal(f.kind, 'result');
+  assert.equal(f.result.clicked_post, false);
+});
+
+test('garbage output and crashes are ambiguous', async () => {
+  assert.equal((await run('garbage')).kind, 'ambiguous');
+  assert.equal((await run('crash')).kind, 'ambiguous');
+});
+
+test('usage limit is detected', async () => {
+  assert.equal((await run('usage')).kind, 'usage_limit');
+});
+
+test('hang is killed by the timeout and is ambiguous', async () => {
+  const r = await run('hang', { timeout: 0.01 });
+  assert.equal(r.kind, 'ambiguous');
+  assert.match(r.error, /Timed out/);
+});
+
+test('media is copied into the job folder and named in the prompt; API key not passed', async () => {
+  const { p } = setup();
+  const src = path.join(p.media, 'pic.jpg');
+  fs.writeFileSync(src, 'x');
+  const record = path.join(p.home, 'record.json');
+  process.env.FAKE_MODE = 'success';
+  process.env.FAKE_RECORD = record;
+  process.env.ANTHROPIC_API_KEY = 'should-not-leak';
+  try {
+    await runJob(job, [{ path: src }], { paths: p, settings: { model: 'sonnet', job_timeout_min: 1 }, claudeBin: FAKE_CLAUDE });
+  } finally {
+    delete process.env.FAKE_RECORD;
+    delete process.env.ANTHROPIC_API_KEY;
+  }
+  const rec = JSON.parse(fs.readFileSync(record, 'utf8'));
+  const copied = path.join(p.jobs, '1', 'pic.jpg');
+  assert.ok(fs.existsSync(copied));
+  assert.ok(rec.input.includes(copied));
+  assert.ok(rec.input.includes('Hi there'));
+  assert.ok(!rec.env.includes('ANTHROPIC_API_KEY'));
+});
+
+test('post links: only https facebook.com, tracking params stripped', () => {
+  assert.equal(cleanPostUrl('https://www.facebook.com/groups/123/posts/456/?__cft__[0]=abc&__tn__=%2CO%2CP-R'),
+    'https://www.facebook.com/groups/123/posts/456/');
+  assert.equal(cleanPostUrl('https://www.facebook.com/permalink.php?story_fbid=9&id=1&__tn__=x'),
+    'https://www.facebook.com/permalink.php?story_fbid=9&id=1');
+  assert.equal(cleanPostUrl('#'), null);
+  assert.equal(cleanPostUrl('javascript:alert(1)'), null);
+  assert.equal(cleanPostUrl('https://evil.com/facebook.com/x'), null);
+  assert.equal(cleanPostUrl('http://www.facebook.com/x'), null);
+  assert.equal(cleanPostUrl('https://www.facebook.com/'), null);
+  assert.equal(cleanPostUrl(null), null);
+  assert.equal(cleanPostUrl('https://www.facebook.com/permalink.php?story_fbid=…&id=1'), null);
+  assert.equal(cleanPostUrl('https://www.facebook.com/permalink.php?story_fbid=[REDACTED]&id=1'), null);
+  const r = parseResultBlock('```json\n{"status":"submitted","clicked_post":true,"post_url":"https://www.facebook.com/x/posts/1?__cft__=z"}\n```');
+  assert.equal(r.post_url, 'https://www.facebook.com/x/posts/1');
+});
+
+test('prompt asks for tab cleanup and skips link hunting', async () => {
+  const { buildPrompt } = await import('../src/prompt.js');
+  assert.doesNotMatch(buildPrompt(job, []), /Getting the post's link/);
+  assert.match(buildPrompt(job, []), /close every tab you opened/);
+});

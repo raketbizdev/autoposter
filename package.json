@@ -1,0 +1,30 @@
+{
+  "name": "autoposter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Facebook post scheduler that publishes through Claude Code + Chrome on your Claude subscription",
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "worker": "node --disable-warning=ExperimentalWarning src/worker.js",
+    "dev": "vite --config web/vite.config.js",
+    "build": "vite build --config web/vite.config.js",
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.js'"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@mui/material": "^7.3.11",
+    "express": "^5.3.0",
+    "lucide-react": "^1.67.0",
+    "multer": "^2.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^6.4.5"
+  }
+}
