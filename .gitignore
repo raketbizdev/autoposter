@@ -9,3 +9,5 @@ web/dist/
 *.local
 release/
 electron/
+docs/facebook_groups.csv
+campaign/
