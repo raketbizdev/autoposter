@@ -1,12 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, IconButton, LinearProgress, Paper, Stack, TextField, Typography,
+  Alert, Autocomplete, Box, Button, Checkbox, IconButton, LinearProgress, Paper, Stack, TextField, Typography,
 } from '@mui/material';
-import { Film, ImagePlus, MapPin, Send, X } from 'lucide-react';
+import { Film, ImagePlus, MapPin, Send, UserRound, X } from 'lucide-react';
 import { api, mediaProblem as platformMediaProblem, PLATFORMS, typeLabel } from '../api.js';
 import { EmptyState, Panel, TypeBadge } from '../components.jsx';
 
 const MAX_BYTES = 10 * 1024 * 1024;
+
+// "Who" posts in Facebook groups: each group's own setting, yourself, or one of your Pages.
+const GROUP_DEFAULT = "Each group's setting";
+const MYSELF = 'Myself';
+const whoValue = (label) => (label === GROUP_DEFAULT ? '' : label === MYSELF ? '@self' : label.trim());
+const whoLabel = (value) => (!value ? GROUP_DEFAULT : value === '@self' ? MYSELF : value);
 
 function localInputValue(date) {
   const d = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -21,6 +27,8 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
   const [when, setWhen] = useState(() => localInputValue(initialWhen || new Date(Date.now() + 15 * 60_000)));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [who, setWho] = useState('');
+  const [whoText, setWhoText] = useState(GROUP_DEFAULT);
 
   useEffect(() => { api.destinations().then(setDestinations).catch((e) => setError(e.message)); }, []);
 
@@ -35,6 +43,9 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
     : hasVideo && files.length > 1 ? 'Attach either one video or images, not both.'
     : '';
   const groupCount = enabled.filter((d) => selected.has(d.id) && d.type === 'group').length;
+  const pageNames = (destinations || []).filter((d) => d.platform === 'facebook' && d.type === 'page').map((d) => d.name);
+  // Who actually posts in a Facebook group: this post's choice, else the group's own setting.
+  const groupAuthor = (d) => (who === '@self' ? null : who || d.post_as || null);
   const kinds = files.map((f) => (f.type.startsWith('video/') ? 'video' : 'image'));
   // Per-platform rules: Instagram needs media, TikTok needs a video, X takes 4 photos.
   const platformProblems = [...new Set(enabled.filter((d) => selected.has(d.id)).map((d) => d.platform))]
@@ -51,10 +62,11 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
       const form = new FormData();
       form.append('body', body);
       form.append('scheduled_at', new Date(when).toISOString());
+      if (who) form.append('post_as', who);
       for (const id of selected) form.append('destination_ids', String(id));
       for (const f of files) form.append('media', f);
       await api.createPost(form);
-      setBody(''); setFiles([]); setSelected(new Set());
+      setBody(''); setFiles([]); setSelected(new Set()); setWho(''); setWhoText(GROUP_DEFAULT);
       onScheduled();
     } catch (err) {
       setError(err.message);
@@ -117,6 +129,22 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
       </Panel>
 
       <Stack spacing={2.5}>
+        <Panel title="Who">
+          <Autocomplete freeSolo autoSelect disableClearable
+            options={[GROUP_DEFAULT, MYSELF, ...pageNames.filter((n) => n !== MYSELF && n !== GROUP_DEFAULT)]}
+            value={whoLabel(who)} inputValue={whoText}
+            onInputChange={(_, v) => setWhoText(v)}
+            onChange={(_, v) => { const next = whoValue(v || GROUP_DEFAULT); setWho(next); setWhoText(whoLabel(next)); }}
+            renderInput={(params) => (
+              <TextField {...params} placeholder="Myself or a Page name"
+                slotProps={{ input: { ...params.InputProps, startAdornment: <Box sx={{ ml: 0.5, mr: 0.5, display: 'flex', color: 'text.secondary' }}><UserRound size={17} /></Box> } }} />
+            )} />
+          <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
+            Who posts in your Facebook groups: yourself or one of your Pages (type the Page's name exactly as Facebook shows it).
+            Profiles, Pages and other platforms always post as that account.
+          </Typography>
+        </Panel>
+
         <Panel title="Where" action={<Typography variant="caption" color="text.secondary">{selected.size} selected</Typography>}>
           <Stack spacing={0.75} sx={{ maxHeight: 340, overflowY: 'auto', mx: -1, px: 1 }}>
             {enabled.map((d) => {
@@ -129,8 +157,8 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
                   <Checkbox size="small" checked={on} onChange={() => toggle(d.id)} sx={{ p: 0.5 }} />
                   <TypeBadge type={d.type} withLabel={false} />
                   <Typography fontWeight={650} fontSize={14} noWrap sx={{ flex: 1 }}>{d.name}</Typography>
-                  {d.post_as && (
-                    <Typography variant="caption" color="primary.main" fontWeight={650} noWrap sx={{ flex: 'none', maxWidth: 140 }}>as {d.post_as}</Typography>
+                  {d.platform === 'facebook' && d.type === 'group' && groupAuthor(d) && (
+                    <Typography variant="caption" color="primary.main" fontWeight={650} noWrap sx={{ flex: 'none', maxWidth: 140 }}>as {groupAuthor(d)}</Typography>
                   )}
                   {d.platform !== 'facebook' && (
                     <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 'none' }}>

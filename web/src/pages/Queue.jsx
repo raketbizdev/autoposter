@@ -124,6 +124,11 @@ function JobDetail({ job, onAction, onSaved, focusLink }) {
           </Stack>
         )}
       </Box>
+      {job.destination_platform === 'facebook' && job.destination_type === 'group' && (
+        <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+          Posts as <strong>{job.post_as === '@self' ? 'you' : job.post_as || job.destination_post_as || 'you'}</strong>
+        </Typography>
+      )}
       {job.last_error && <Alert severity="error" sx={{ mt: 1.5 }}>{job.last_error}</Alert>}
       {job.status === 'awaiting_join' && (
         <Alert severity="info" icon={<UserRoundPlus size={20} />} sx={{ mt: 1.5 }}>

@@ -97,6 +97,11 @@ export function openDb(file) {
   if (!db.prepare('PRAGMA table_info(destinations)').all().some((c) => c.name === 'post_as')) {
     db.exec('ALTER TABLE destinations ADD COLUMN post_as TEXT');
   }
+  // Who posts this one job in a Facebook group, chosen in Compose. NULL: the group's own "Post as" setting.
+  // '@self': the person's own profile. Anything else: the name of one of their Pages.
+  if (!db.prepare('PRAGMA table_info(jobs)').all().some((c) => c.name === 'post_as')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN post_as TEXT');
+  }
   // "Post now" flag: the next worker pass runs this job first, ignoring the group gap, daily cap and usage pause.
   if (!db.prepare('PRAGMA table_info(jobs)').all().some((c) => c.name === 'force_now')) {
     db.exec('ALTER TABLE jobs ADD COLUMN force_now INTEGER NOT NULL DEFAULT 0');

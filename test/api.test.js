@@ -172,3 +172,23 @@ test('Facebook groups can be set to post as a Page; other destinations cannot', 
   assert.equal(page.status, 400);
   await fetch(`${base}/api/destinations/${g.id}`, { method: 'DELETE' });
 });
+
+test('Compose "Who" sets who posts in Facebook groups only', async () => {
+  const g = await (await json('POST', '/api/destinations', { name: 'WG', type: 'group', url: 'https://www.facebook.com/groups/whoTest', post_as: 'Group Default Page' })).json();
+  const pf = await (await json('POST', '/api/destinations', { name: 'WP', type: 'profile', url: 'https://www.facebook.com/whoProfile' })).json();
+  const schedule = async (who) => {
+    const form = new FormData();
+    form.append('body', 'hi');
+    form.append('scheduled_at', new Date(Date.now() + 86_400_000).toISOString());
+    form.append('destination_ids', String(g.id));
+    form.append('destination_ids', String(pf.id));
+    if (who !== undefined) form.append('post_as', who);
+    const r = await fetch(`${base}/api/posts`, { method: 'POST', body: form });
+    assert.equal(r.status, 201);
+    return db.prepare('SELECT d.type, j.post_as FROM jobs j JOIN destinations d ON d.id = j.destination_id WHERE j.post_id = ? ORDER BY d.type').all((await r.json()).id);
+  };
+  assert.deepEqual((await schedule('My Shop')).map((r) => r.post_as), ['My Shop', null], 'only the group gets the Page');
+  assert.deepEqual((await schedule('@self')).map((r) => r.post_as), ['@self', null]);
+  assert.deepEqual((await schedule()).map((r) => r.post_as), [null, null], 'no choice keeps the group setting');
+  for (const id of [g.id, pf.id]) await fetch(`${base}/api/destinations/${id}`, { method: 'DELETE' });
+});

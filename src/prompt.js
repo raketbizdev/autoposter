@@ -35,7 +35,8 @@ function facebookInstructions(job, settings = {}) {
     ].join('\n');
   }
   const about = settings.join_about || "I'm interested in what this group discusses and want to follow the conversations here.";
-  const page = job.destination_post_as;
+  // Chosen in Compose for this post, else the group's own "Post as" setting.
+  const page = job.post_as === '@self' ? null : (job.post_as || job.destination_post_as);
   const asPage = page ? [
     `POST AS THE PAGE "${page}", NOT as the owner's personal profile.`,
     `- First switch the group to the Page: look for the identity switcher on the group page (the owner's small profile picture with a ▾ next to the Join/Joined button or the composer, or a line like "You're interacting as …") and choose "${page}".`,

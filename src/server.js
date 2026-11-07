@@ -73,7 +73,7 @@ async function waitFor(check, ms = 5000) {
 }
 
 const JOB_SELECT = `SELECT j.id, j.post_id, j.destination_id, j.scheduled_at, j.status, j.attempts, j.last_error,
-  j.post_url, j.started_at, j.finished_at, j.force_now, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
+  j.post_url, j.started_at, j.finished_at, j.force_now, j.post_as, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
   d.platform AS destination_platform, d.post_as AS destination_post_as, d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
 
 export function createApp(db, p) {
@@ -141,6 +141,9 @@ export function createApp(db, p) {
     const cleanup = () => files.forEach((f) => fs.rmSync(f.path, { force: true }));
     try {
       const body = String(req.body.body ?? '');
+      const whoRaw = String(req.body.post_as ?? '').trim();
+      if (whoRaw.length > 100) throw new HttpError(400, 'The Page name is too long');
+      const who = whoRaw || null; // null: each group's own setting; '@self': yourself; otherwise a Page name
       const scheduledAt = new Date(req.body.scheduled_at);
       const destinationIds = [].concat(req.body.destination_ids ?? []).map(Number).filter(Boolean);
       if (!body.trim() && !files.length) throw new HttpError(400, 'Write some text or attach media');
@@ -171,8 +174,11 @@ export function createApp(db, p) {
           db.prepare('INSERT INTO post_media(post_id, path, kind, size_bytes) VALUES (?, ?, ?, ?)')
             .run(post.id, target, kinds[i], f.size);
         });
-        const insertJob = db.prepare('INSERT INTO jobs(post_id, destination_id, scheduled_at) VALUES (?, ?, ?)');
-        for (const d of dests) insertJob.run(post.id, d.id, scheduledAt.toISOString());
+        const insertJob = db.prepare('INSERT INTO jobs(post_id, destination_id, scheduled_at, post_as) VALUES (?, ?, ?, ?)');
+        // "Who" only changes who posts in Facebook groups; profiles, Pages and other platforms post as themselves.
+        for (const d of dests) {
+          insertJob.run(post.id, d.id, scheduledAt.toISOString(), d.platform === 'facebook' && d.type === 'group' ? who : null);
+        }
         return post.id;
       });
       res.status(201).json({ id: postId, jobs: dests.length });

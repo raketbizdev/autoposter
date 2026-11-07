@@ -135,3 +135,11 @@ test('a Facebook group set to post as a Page switches to it and never falls back
   assert.match(asPage, /do NOT post as the owner instead/);
   assert.doesNotMatch(buildPrompt(g, []), /POST AS THE PAGE/);
 });
+
+test('the post\'s own "Who" beats the group setting; "@self" posts as the person', async () => {
+  const { buildPrompt } = await import('../src/prompt.js');
+  const g = { destination_platform: 'facebook', destination_type: 'group', destination_name: 'G', destination_url: 'https://www.facebook.com/groups/g', post_body: 'Hi', destination_post_as: 'Group Page' };
+  assert.match(buildPrompt({ ...g, post_as: 'Other Page' }, []), /POST AS THE PAGE "Other Page"/);
+  assert.doesNotMatch(buildPrompt({ ...g, post_as: '@self' }, []), /POST AS THE PAGE/);
+  assert.match(buildPrompt(g, []), /POST AS THE PAGE "Group Page"/);
+});
