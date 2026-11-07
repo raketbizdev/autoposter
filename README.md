@@ -12,16 +12,17 @@ publishes the post on the website in your signed-in Chrome, the way you would by
 Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → the social network
 ```
 
-## Download (macOS and Windows)
+## Get the app (macOS and Windows)
 
-Get the installer from **[Releases](https://github.com/raketbizdev/autoposter/releases/latest)**:
+**Ready-to-install app:** buy it on Lemon Squeezy (link coming soon). You get the Mac (Apple Silicon and Intel) and
+Windows installers. **Build it yourself for free:** everything is here under the MIT license; see
+[Run from source](#run-from-source) and build your own installer with `npm run dist:mac` or `npm run dist:win`.
 
-- **Mac:** `Autoposter-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Open it and drag Autoposter
-  to Applications. The app isn't notarized by Apple yet, so macOS blocks the first open: go to
-  **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
-  `xattr -dr com.apple.quarantine /Applications/Autoposter.app` in Terminal, then open it again.
-- **Windows:** `Autoposter-…-win-x64.exe`. If SmartScreen says "Windows protected your PC", click
-  **More info → Run anyway** (the installer isn't code-signed yet).
+- **Mac:** open the `.dmg` and drag Autoposter to Applications. The app isn't notarized by Apple yet, so macOS blocks
+  the first open: go to **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app
+  "is damaged", run `xattr -dr com.apple.quarantine /Applications/Autoposter.app` in Terminal, then open it again.
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway** (the installer isn't
+  code-signed yet).
 
 Open Autoposter and the **Setup** page walks you through the rest, about 5 minutes, once:
 
@@ -53,8 +54,7 @@ npm run worker                      # in another terminal
 bash scripts/install-launchd.sh     # macOS only: run server + worker at every login and restart them if they die
 ```
 
-Build installers with `npm run dist:mac` or `npm run dist:win`. Pushing a `v*` tag builds both on GitHub Actions
-and attaches them to a GitHub Release.
+Build installers with `npm run dist:mac` or `npm run dist:win` (they land in `release/`).
 
 ## Use it
 

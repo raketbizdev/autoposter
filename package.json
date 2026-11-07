@@ -90,14 +90,6 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "shortcutName": "Autoposter"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "raketbizdev",
-        "repo": "autoposter",
-        "releaseType": "release"
-      }
-    ]
+    }
   }
 }
