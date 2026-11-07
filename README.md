@@ -12,11 +12,22 @@ publishes the post on the website in your signed-in Chrome, the way you would by
 Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → the social network
 ```
 
-## Get the app (macOS and Windows)
+## Easy install
 
-**Ready-to-install app:** buy it on Lemon Squeezy (link coming soon). You get the Mac (Apple Silicon and Intel) and
-Windows installers. **Build it yourself for free:** everything is here under the MIT license; see
-[Run from source](#run-from-source) and build your own installer with `npm run dist:mac` or `npm run dist:win`.
+Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple Silicon and Intel) and Windows**:
+
+<!-- Replace "coming soon" with the product links once they're live. -->
+| Store | Link |
+|---|---|
+| **Lemon Squeezy** | coming soon |
+| **Gumroad** | coming soon |
+
+Launch price: **$19 for the first 100 customers**, then $39. One-time payment.
+
+Prefer free? Everything is here under the MIT license: see [Run from source](#run-from-source), or build your own
+installer with `npm run dist:mac` or `npm run dist:win`.
+
+### Installing
 
 - **Mac:** open the `.dmg` and drag Autoposter to Applications. The app isn't notarized by Apple yet, so macOS blocks
   the first open: go to **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app
