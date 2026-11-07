@@ -1,15 +1,15 @@
 # Autoposter
 
-A local Facebook post scheduler. You write and schedule posts in a React dashboard. At post time, a local
+A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
 worker runs **Claude Code on your Claude subscription** with the **Claude in Chrome** extension, and Claude
-publishes the post on facebook.com in your signed-in Chrome, the way you would by hand.
+publishes the post on the website in your signed-in Chrome, the way you would by hand.
 
 - No Anthropic API, API keys or token billing. The worker removes `ANTHROPIC_API_KEY` and similar variables
   from Claude's environment and never uses `--bare`, which would bypass the subscription login.
-- No Graph API, Meta API or MCP publishing server. Chrome is the only tool Claude gets.
+- No Graph API, Meta, X, LinkedIn, Reddit or TikTok API, and no MCP publishing server. Chrome is the only tool Claude gets.
 
 ```
-Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → facebook.com
+Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → the social network
 ```
 
 ## Download (macOS and Windows)
@@ -64,6 +64,20 @@ and attaches them to a GitHub Release.
 2. **Destinations:** add your profile (`https://www.facebook.com/me` works), Pages you can post as, and groups you can post in.
 3. **Compose:** write text, attach photos or one video, tick destinations, pick a time.
 4. **Queue:** watch each post's status and read Claude's report for any run.
+
+## Platforms
+
+| Platform | Destinations | Notes |
+|---|---|---|
+| Facebook | Profile, Pages, groups | Joins groups first if needed and answers membership questions. |
+| LinkedIn | Profile, company Pages, groups | Page posts go out as the Page. |
+| X | Profile | Long text fails unless your account allows it; Claude never shortens it. Up to 4 photos. |
+| Threads | Profile | |
+| Reddit | Your profile, subreddits | The first line of the post is the title. Claude picks a flair when one is required. |
+| Instagram | Profile | Needs a photo or a video. |
+| TikTok | Profile | Needs a video. |
+
+Chrome must be signed in to each account you post to. The group gap applies between group posts on the same platform.
 
 ## Statuses
 

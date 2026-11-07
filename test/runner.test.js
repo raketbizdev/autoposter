@@ -86,6 +86,10 @@ test('post links: only https facebook.com, tracking params stripped', () => {
     'https://www.facebook.com/groups/123/posts/456/');
   assert.equal(cleanPostUrl('https://www.facebook.com/permalink.php?story_fbid=9&id=1&__tn__=x'),
     'https://www.facebook.com/permalink.php?story_fbid=9&id=1');
+  assert.equal(cleanPostUrl('https://x.com/me/status/123?s=20&t=abc'), 'https://x.com/me/status/123');
+  assert.equal(cleanPostUrl('https://www.reddit.com/r/test/comments/abc/title/?utm_source=share'), 'https://www.reddit.com/r/test/comments/abc/title/');
+  assert.equal(cleanPostUrl('https://www.linkedin.com/feed/update/urn:li:activity:1/?trk=x'), 'https://www.linkedin.com/feed/update/urn:li:activity:1/');
+  assert.equal(cleanPostUrl('https://example.com/post/1'), null);
   assert.equal(cleanPostUrl('#'), null);
   assert.equal(cleanPostUrl('javascript:alert(1)'), null);
   assert.equal(cleanPostUrl('https://evil.com/facebook.com/x'), null);
@@ -102,4 +106,23 @@ test('prompt asks for tab cleanup and skips link hunting', async () => {
   const { buildPrompt } = await import('../src/prompt.js');
   assert.doesNotMatch(buildPrompt(job, []), /Getting the post's link/);
   assert.match(buildPrompt(job, []), /close every tab you opened/);
+});
+
+test('each platform gets its own instructions; Reddit uses the first line as the title', async () => {
+  const { buildPrompt } = await import('../src/prompt.js');
+  const base = { destination_name: 'Dest', post_body: 'Title here\nBody', destination_audience: 'default' };
+  const reddit = buildPrompt({ ...base, destination_platform: 'reddit', destination_type: 'group', destination_url: 'https://www.reddit.com/r/test/' }, []);
+  assert.match(reddit, /ONE Reddit post/);
+  assert.match(reddit, /FIRST LINE of the post text as the title/);
+  assert.match(reddit, /https:\/\/www\.reddit\.com\/r\/test\/submit/);
+  assert.match(reddit, /Stay on reddit\.com/);
+  assert.doesNotMatch(reddit, /facebook/i);
+  for (const [platform, re] of [['linkedin', /Start a post/], ['x', /What is happening/], ['threads', /What's new/],
+    ['instagram', /Share once/], ['tiktok', /tiktokstudio\/upload/]]) {
+    const p = buildPrompt({ ...base, destination_platform: platform, destination_type: 'profile', destination_url: 'https://example/' }, []);
+    assert.match(p, re, platform);
+    assert.doesNotMatch(p, /facebook/i, platform);
+  }
+  const fb = buildPrompt({ ...base, destination_type: 'group', destination_url: 'https://www.facebook.com/groups/x' }, []);
+  assert.match(fb, /ONE Facebook post/, 'jobs without a platform are Facebook');
 });

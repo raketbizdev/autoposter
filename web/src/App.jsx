@@ -104,7 +104,7 @@ function Sidebar({ page, go, status, onStatusChange, setupDone }) {
         </Box>
         <Box>
           <Typography sx={{ fontFamily: '"Bricolage Grotesque Variable"', fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>Autoposter</Typography>
-          <Typography variant="caption" sx={{ color: tokens.inkMuted }}>Facebook scheduler</Typography>
+          <Typography variant="caption" sx={{ color: tokens.inkMuted }}>Social post scheduler</Typography>
         </Box>
       </Stack>
 

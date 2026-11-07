@@ -38,16 +38,27 @@ export const api = {
 };
 
 export const TYPE_LABEL = { profile: 'Profile', page: 'Page', group: 'Group' };
-// Mirrors src/platforms.js (labels and allowed types only). Only Facebook can be posted to today.
+// Mirrors src/platforms.js.
 export const PLATFORMS = {
-  facebook: { label: 'Facebook', types: ['profile', 'page', 'group'], posting: true, example: 'https://www.facebook.com/…' },
-  reddit: { label: 'Reddit', types: ['profile', 'group'], typeLabel: { group: 'Subreddit' }, example: 'https://www.reddit.com/r/…' },
-  linkedin: { label: 'LinkedIn', types: ['profile', 'page', 'group'], example: 'https://www.linkedin.com/in/…' },
-  tiktok: { label: 'TikTok', types: ['profile'], example: 'https://www.tiktok.com/@…' },
-  x: { label: 'X', types: ['profile'], example: 'https://x.com/…' },
-  threads: { label: 'Threads', types: ['profile'], example: 'https://www.threads.com/@…' },
-  instagram: { label: 'Instagram', types: ['profile'], example: 'https://www.instagram.com/…' },
+  facebook: { label: 'Facebook', types: ['profile', 'page', 'group'], posting: true, maxImages: 10, example: 'https://www.facebook.com/…' },
+  linkedin: { label: 'LinkedIn', types: ['profile', 'page', 'group'], posting: true, maxImages: 10, example: 'https://www.linkedin.com/in/…' },
+  x: { label: 'X', types: ['profile'], posting: true, maxImages: 4, example: 'https://x.com/…' },
+  threads: { label: 'Threads', types: ['profile'], posting: true, maxImages: 10, example: 'https://www.threads.com/@…' },
+  reddit: { label: 'Reddit', types: ['profile', 'group'], typeLabel: { group: 'Subreddit' }, posting: true, maxImages: 10,
+    example: 'https://www.reddit.com/r/…', hint: 'The first line of your post becomes the Reddit title.' },
+  instagram: { label: 'Instagram', types: ['profile'], posting: true, maxImages: 10, needs: 'media', example: 'https://www.instagram.com/…' },
+  tiktok: { label: 'TikTok', types: ['profile'], posting: true, maxImages: 0, needs: 'video', example: 'https://www.tiktok.com/@…' },
 };
+// Mirrors mediaProblem() in src/platforms.js.
+export function mediaProblem(platform, kinds) {
+  const pf = PLATFORMS[platform];
+  const images = kinds.filter((k) => k === 'image').length;
+  const video = kinds.includes('video');
+  if (pf.needs === 'video' && !video) return `${pf.label} needs a video`;
+  if (pf.needs === 'media' && !images && !video) return `${pf.label} needs a photo or a video`;
+  if (images > pf.maxImages) return pf.maxImages ? `${pf.label} takes at most ${pf.maxImages} photos` : `${pf.label} takes a video, not photos`;
+  return null;
+}
 export const typeLabel = (platform, type) => PLATFORMS[platform]?.typeLabel?.[type] ?? TYPE_LABEL[type];
 export const AUDIENCE_LABEL = { default: 'Composer default', public: 'Public', friends: 'Friends', only_me: 'Only me' };
 export const STATUS_LABEL = {

@@ -6,7 +6,7 @@ import { Panel } from '../components.jsx';
 
 const FIELDS = [
   ['daily_cap', 'Max posts per day', 'posts', Gauge, 'Across all destinations. Protects your Facebook account and your Claude usage.'],
-  ['group_gap_minutes', 'Gap between group posts', 'min', UsersRound, 'Posting to many groups at once looks like spam to Facebook.'],
+  ['group_gap_minutes', 'Gap between group posts', 'min', UsersRound, 'Between Facebook groups, subreddits and LinkedIn groups on the same platform. Many at once looks like spam.'],
   ['max_attempts', 'Attempts per post', 'tries', RotateCcw, 'Only retried when Claude confirms it never clicked Post.'],
   ['job_timeout_min', 'Stop a run after', 'min', Timer, 'Videos need longer. A stopped run is marked "Needs check".'],
 ];

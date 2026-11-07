@@ -104,13 +104,20 @@ test('stale running jobs become needs_check', async () => {
   assert.equal(status(db, j.id), 'needs_check');
 });
 
-test('non-Facebook destinations are never claimed', async () => {
+test('other platforms are posted too, and the group gap is per platform', async () => {
   const { db, p } = setup();
-  const d = addDestination(db);
-  db.prepare("UPDATE destinations SET platform = 'reddit' WHERE id = ?").run(d.id);
-  const j = addJob(db, d.id, T0);
-  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'idle');
-  assert.equal(status(db, j.id), 'queued');
+  const fbGroup = addDestination(db, { name: 'FB', type: 'group' });
+  const sub1 = addDestination(db, { name: 'r/one', type: 'group' });
+  const sub2 = addDestination(db, { name: 'r/two', type: 'group' });
+  db.prepare("UPDATE destinations SET platform = 'reddit' WHERE id IN (?, ?)").run(sub1.id, sub2.id);
+  const j1 = addJob(db, fbGroup.id, T0);
+  const j2 = addJob(db, sub1.id, T0);
+  const j3 = addJob(db, sub2.id, T0);
+  const opts = (now) => ({ paths: p, runJob: fakeRun(ok), now: () => now });
+  assert.equal((await tick(db, opts(T0))).jobId, j1.id);
+  assert.equal((await tick(db, opts(at(1)))).jobId, j2.id, 'a Facebook group post does not block a subreddit');
+  assert.equal((await tick(db, opts(at(2)))).action, 'idle', 'the second subreddit waits for the gap');
+  assert.equal((await tick(db, opts(at(22)))).jobId, j3.id);
 });
 
 test('disabled destinations are skipped but keep their jobs', async () => {

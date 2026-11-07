@@ -132,7 +132,7 @@ export function tx(db, fn) {
 
 export function getJob(db, id) {
   return db.prepare(`
-    SELECT j.*, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
+    SELECT j.*, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url, d.platform AS destination_platform,
            d.audience AS destination_audience, d.enabled AS destination_enabled, p.body AS post_body
     FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id
     WHERE j.id = ?`).get(id);

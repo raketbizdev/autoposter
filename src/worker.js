@@ -37,14 +37,16 @@ export function postedToday(db, now) {
     .get(nowIso(startOfLocalDay(now))).n;
 }
 
-export function lastGroupStart(db) {
+// Group posts (Facebook groups, subreddits, LinkedIn groups) are spaced per platform: a subreddit post doesn't
+// hold up a Facebook group post.
+export function lastGroupStart(db, platform = 'facebook') {
   return db.prepare(`SELECT MAX(j.started_at) AS t FROM jobs j JOIN destinations d ON d.id = j.destination_id
-    WHERE d.type = 'group' AND j.started_at IS NOT NULL`).get().t;
+    WHERE d.type = 'group' AND d.platform = ? AND j.started_at IS NOT NULL`).get(platform).t;
 }
 
 export function forcedJob(db) {
   return db.prepare(`SELECT j.id FROM jobs j JOIN destinations d ON d.id = j.destination_id
-    WHERE j.force_now = 1 AND j.status IN ('queued','awaiting_join') AND d.archived = 0 AND d.platform = 'facebook'
+    WHERE j.force_now = 1 AND j.status IN ('queued','awaiting_join') AND d.archived = 0
     ORDER BY j.id LIMIT 1`).get()?.id ?? null;
 }
 
@@ -58,13 +60,19 @@ export function claimNext(db, settings, now) {
         WHERE id = ? AND status IN ('queued','awaiting_join') RETURNING id`).get(nowIso(now), forced);
       return claimed ? getJob(db, claimed.id) : null;
     }
-    const due = db.prepare(`SELECT j.id, d.type FROM jobs j JOIN destinations d ON d.id = j.destination_id
-      WHERE j.status IN ('queued','awaiting_join') AND j.scheduled_at <= ? AND d.enabled = 1 AND d.archived = 0 AND d.platform = 'facebook'
+    const due = db.prepare(`SELECT j.id, d.type, d.platform FROM jobs j JOIN destinations d ON d.id = j.destination_id
+      WHERE j.status IN ('queued','awaiting_join') AND j.scheduled_at <= ? AND d.enabled = 1 AND d.archived = 0
       ORDER BY j.scheduled_at, j.id`).all(nowIso(now));
-    const lastGroup = lastGroupStart(db);
     const gapMs = Number(settings.group_gap_minutes) * 60_000;
-    const groupBlocked = lastGroup && now.getTime() - new Date(lastGroup).getTime() < gapMs;
-    const pick = due.find((j) => !(j.type === 'group' && groupBlocked));
+    const blocked = {};
+    const groupBlocked = (platform) => {
+      if (!(platform in blocked)) {
+        const last = lastGroupStart(db, platform);
+        blocked[platform] = Boolean(last && now.getTime() - new Date(last).getTime() < gapMs);
+      }
+      return blocked[platform];
+    };
+    const pick = due.find((j) => !(j.type === 'group' && groupBlocked(j.platform)));
     if (!pick) return null;
     const claimed = db.prepare(`UPDATE jobs SET status = 'running', started_at = ?, attempts = attempts + 1
       WHERE id = ? AND status IN ('queued','awaiting_join') RETURNING id`).get(nowIso(now), pick.id);

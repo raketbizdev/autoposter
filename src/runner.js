@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildPrompt } from './prompt.js';
+import { ALL_HOSTS } from './platforms.js';
 import { findClaude, spawnClaude, envWithClaude, killTree } from './platform.js';
 
 // Anything here would switch Claude Code off the subscription login and onto paid API billing.
@@ -30,14 +31,14 @@ export function cleanEnv(env = process.env) {
 
 const STATUSES = new Set(['submitted', 'pending_approval', 'awaiting_join', 'failed']);
 
-const TRACKING_PARAMS = /^(__cft__|__tn__|__xts__|_rdr|ref|rdid|share_url|mibextid)/;
+const TRACKING_PARAMS = /^(__cft__|__tn__|__xts__|_rdr|ref|rdid|share_url|mibextid|utm_|igsh|si$|s$|t$|rcm|trk)/;
 
-// Only an https facebook.com link is stored, minus Facebook's tracking parameters.
+// Only an https link on a supported platform is stored, minus tracking parameters.
 export function cleanPostUrl(value) {
   if (typeof value !== 'string') return null;
   let u;
   try { u = new URL(value.trim()); } catch { return null; }
-  if (u.protocol !== 'https:' || !/(^|\.)facebook\.com$/.test(u.hostname)) return null;
+  if (u.protocol !== 'https:' || !ALL_HOSTS.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))) return null;
   if (u.pathname === '/' || u.pathname === '') return null;
   if (/…|%E2%80%A6|redacted/i.test(u.href)) return null; // a partially hidden link is not a link
   for (const key of [...u.searchParams.keys()]) if (TRACKING_PARAMS.test(key)) u.searchParams.delete(key);

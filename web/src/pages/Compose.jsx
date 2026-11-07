@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Checkbox, IconButton, LinearProgress, Paper, Stack, TextField, Typography,
 } from '@mui/material';
 import { Film, ImagePlus, MapPin, Send, X } from 'lucide-react';
-import { api } from '../api.js';
+import { api, mediaProblem as platformMediaProblem, PLATFORMS, typeLabel } from '../api.js';
 import { EmptyState, Panel, TypeBadge } from '../components.jsx';
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -24,7 +24,7 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
 
   useEffect(() => { api.destinations().then(setDestinations).catch((e) => setError(e.message)); }, []);
 
-  const enabled = (destinations || []).filter((d) => d.enabled && d.platform === 'facebook');
+  const enabled = (destinations || []).filter((d) => d.enabled && PLATFORMS[d.platform]?.posting);
   const previews = useMemo(() => files.map((f) => ({ f, url: URL.createObjectURL(f) })), [files]);
   useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
 
@@ -35,6 +35,11 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
     : hasVideo && files.length > 1 ? 'Attach either one video or images, not both.'
     : '';
   const groupCount = enabled.filter((d) => selected.has(d.id) && d.type === 'group').length;
+  const kinds = files.map((f) => (f.type.startsWith('video/') ? 'video' : 'image'));
+  // Per-platform rules: Instagram needs media, TikTok needs a video, X takes 4 photos.
+  const platformProblems = [...new Set(enabled.filter((d) => selected.has(d.id)).map((d) => d.platform))]
+    .map((pf) => platformMediaProblem(pf, kinds)).filter(Boolean);
+  const hints = [...new Set(enabled.filter((d) => selected.has(d.id)).map((d) => PLATFORMS[d.platform].hint).filter(Boolean))];
 
   const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -69,7 +74,7 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
     );
   }
 
-  const canSubmit = !busy && !mediaProblem && selected.size && (body.trim() || files.length);
+  const canSubmit = !busy && !mediaProblem && !platformProblems.length && selected.size && (body.trim() || files.length);
 
   return (
     <Box component="form" onSubmit={submit}
@@ -124,13 +129,20 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
                   <Checkbox size="small" checked={on} onChange={() => toggle(d.id)} sx={{ p: 0.5 }} />
                   <TypeBadge type={d.type} withLabel={false} />
                   <Typography fontWeight={650} fontSize={14} noWrap sx={{ flex: 1 }}>{d.name}</Typography>
+                  {d.platform !== 'facebook' && (
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 'none' }}>
+                      {PLATFORMS[d.platform].label}{d.type !== 'profile' ? ` · ${typeLabel(d.platform, d.type)}` : ''}
+                    </Typography>
+                  )}
                 </Box>
               );
             })}
           </Stack>
+          {platformProblems.map((m) => <Alert key={m} severity="warning" sx={{ mt: 1.5 }}>{m}. Add one or untick it.</Alert>)}
+          {hints.map((h) => <Typography key={h} variant="caption" color="text.secondary" display="block" mt={1.5}>{h}</Typography>)}
           {groupCount > 1 && (
             <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>
-              {groupCount} groups go out one at a time, spaced by the group gap in Settings, to avoid spam flags.
+              {groupCount} groups go out one at a time, spaced by the group gap in Settings (per platform), to avoid spam flags.
             </Typography>
           )}
         </Panel>

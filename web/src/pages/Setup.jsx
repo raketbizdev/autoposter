@@ -102,10 +102,10 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
           )}
         </Step>
 
-        <Step n={3} done={false} title="Connect Chrome and Facebook">
+        <Step n={3} done={false} title="Connect Chrome and your social accounts">
           <Typography fontSize={14} mb={1.25}>
             Install the <strong>Claude in Chrome</strong> extension, sign in to it with the same Claude account, and make sure
-            that Chrome is logged in to Facebook. Keep Chrome open when posts are due.
+            that Chrome is logged in to every account you'll post to (Facebook, LinkedIn, X, Threads, Reddit, Instagram, TikTok). Keep Chrome open when posts are due.
           </Typography>
           <Button variant="outlined" color="secondary" startIcon={<Globe size={16} />} endIcon={<ExternalLink size={14} />}
             href={CHROME_EXTENSION_URL} target="_blank" rel="noreferrer">
@@ -135,7 +135,7 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
 
       <Typography variant="caption" color="text.secondary">
         <SquareTerminal size={13} style={{ verticalAlign: '-2px' }} /> Each post is a real Claude session in your Chrome and counts toward
-        your plan's usage limits. Facebook's terms restrict automation, so keep the daily cap low.
+        your plan's usage limits. Social networks restrict automation, so keep the daily cap low.
       </Typography>
     </Stack>
   );

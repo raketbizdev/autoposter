@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { paths as getPaths, PORT, HOST, LIMITS } from './config.js';
 import { openDb, getSettings, setSetting, nowIso, tx, DEFAULT_SETTINGS } from './db.js';
-import { PLATFORMS, isPlatformUrl } from './platforms.js';
+import { PLATFORMS, isPlatformUrl, mediaProblem } from './platforms.js';
 import { postedToday } from './worker.js';
 import { cleanPostUrl } from './runner.js';
 
@@ -63,7 +63,7 @@ async function waitFor(check, ms = 5000) {
 
 const JOB_SELECT = `SELECT j.id, j.post_id, j.destination_id, j.scheduled_at, j.status, j.attempts, j.last_error,
   j.post_url, j.started_at, j.finished_at, j.force_now, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
-  d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
+  d.platform AS destination_platform, d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
 
 export function createApp(db, p) {
   const app = express();
@@ -143,6 +143,10 @@ export function createApp(db, p) {
       if (dests.some((d) => !d)) throw new HttpError(400, 'Unknown destination');
       const unsupported = dests.find((d) => !PLATFORMS[d.platform]?.posting);
       if (unsupported) throw new HttpError(400, `Posting to ${PLATFORMS[unsupported.platform].label} isn't supported yet`);
+      for (const d of dests) {
+        const problem = mediaProblem(d.platform, kinds);
+        if (problem) throw new HttpError(400, `${problem} (${d.name})`);
+      }
 
       const postId = tx(db, () => {
         const post = db.prepare('INSERT INTO posts(body, created_at) VALUES (?, ?) RETURNING id').get(body, nowIso());
@@ -223,7 +227,7 @@ export function createApp(db, p) {
   app.post('/api/jobs/:id/link', (req, res) => {
     const raw = String(req.body?.url ?? '').trim();
     const url = raw ? cleanPostUrl(raw) : null;
-    if (raw && !url) throw new HttpError(400, 'Paste a https://www.facebook.com/… link to the post');
+    if (raw && !url) throw new HttpError(400, 'Paste the https:// link to the post');
     const row = db.prepare('UPDATE jobs SET post_url = ? WHERE id = ? RETURNING id, post_url').get(url, req.params.id);
     if (!row) throw new HttpError(404, 'Job not found');
     res.json(row);

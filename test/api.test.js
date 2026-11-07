@@ -27,7 +27,7 @@ test('destinations CRUD and validation', async () => {
   assert.equal((await (await fetch(`${base}/api/destinations`)).json()).length, 0);
 });
 
-test('non-Facebook destinations can be saved but not scheduled', async () => {
+test('other platforms: URLs are checked and media rules apply per platform', async () => {
   assert.equal((await json('POST', '/api/destinations', { name: 'R', platform: 'reddit', type: 'group', url: 'https://www.facebook.com/x' })).status, 400);
   assert.equal((await json('POST', '/api/destinations', { name: 'T', platform: 'tiktok', type: 'group', url: 'https://www.tiktok.com/@me' })).status, 400);
   assert.equal((await json('POST', '/api/destinations', { name: 'M', platform: 'myspace', type: 'profile', url: 'https://myspace.com/me' })).status, 400);
@@ -38,14 +38,26 @@ test('non-Facebook destinations can be saved but not scheduled', async () => {
   assert.equal(d.audience, 'default');
   const x = await json('POST', '/api/destinations', { name: 'X', platform: 'x', type: 'profile', url: 'https://twitter.com/me' });
   assert.equal(x.status, 201);
-  const form = new FormData();
-  form.append('body', 'hi');
-  form.append('scheduled_at', new Date().toISOString());
-  form.append('destination_ids', String(d.id));
-  const res = await fetch(`${base}/api/posts`, { method: 'POST', body: form });
-  assert.equal(res.status, 400);
-  assert.match((await res.json()).error, /Reddit/);
-  for (const id of [d.id, (await x.json()).id]) await fetch(`${base}/api/destinations/${id}`, { method: 'DELETE' });
+  const xId = (await x.json()).id;
+  const ig = await (await json('POST', '/api/destinations', { name: 'IG', platform: 'instagram', type: 'profile', url: 'https://www.instagram.com/me' })).json();
+  const schedule = (ids, files = []) => {
+    const form = new FormData();
+    form.append('body', 'Title\nhi');
+    form.append('scheduled_at', new Date(Date.now() + 86_400_000).toISOString());
+    for (const id of ids) form.append('destination_ids', String(id));
+    for (const f of files) form.append('media', f);
+    return fetch(`${base}/api/posts`, { method: 'POST', body: form });
+  };
+  assert.equal((await schedule([d.id, xId])).status, 201, 'Reddit and X accept text-only posts');
+  const noMedia = await schedule([ig.id]);
+  assert.equal(noMedia.status, 400);
+  assert.match((await noMedia.json()).error, /Instagram needs a photo or a video/);
+  const png = () => new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' });
+  const tooMany = await schedule([xId], [png(), png(), png(), png(), png()]);
+  assert.equal(tooMany.status, 400);
+  assert.match((await tooMany.json()).error, /X takes at most 4 photos/);
+  assert.equal((await schedule([ig.id], [png()])).status, 201);
+  for (const id of [d.id, xId, ig.id]) await fetch(`${base}/api/destinations/${id}`, { method: 'DELETE' });
 });
 
 test('scheduling a post with an image to two destinations creates two jobs', async () => {

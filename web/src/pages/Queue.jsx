@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Link, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import { Ban, ChevronDown, Send, Trash2, CircleCheck, Copy, ExternalLink, Link2, ListChecks, RotateCcw, UserRoundPlus } from 'lucide-react';
-import { api, STATUS_LABEL, TYPE_LABEL, formatWhen } from '../api.js';
+import { api, PLATFORMS, STATUS_LABEL, TYPE_LABEL, formatWhen } from '../api.js';
 import { EmptyState, StatusChip, TypeBadge } from '../components.jsx';
 
 const FILTERS = ['', 'queued', 'awaiting_join', 'needs_check', 'failed', 'submitted', 'pending_approval', 'cancelled'];
@@ -62,7 +62,7 @@ function PostLinkField({ job, onSaved, autoFocus }) {
       <Typography fontSize={13} fontWeight={700} mb={0.75}>Post link</Typography>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
         <TextField size="small" fullWidth autoFocus={autoFocus} value={value} onChange={(e) => setValue(e.target.value)}
-          placeholder="Paste the post's link from Facebook (… → Copy link)" error={!!error} helperText={error || undefined}
+          placeholder="Paste the post's link (… → Copy link)" error={!!error} helperText={error || undefined}
           slotProps={{ input: { startAdornment: <Box sx={{ mr: 1, display: 'flex', color: 'text.secondary' }}><Link2 size={16} /></Box> } }} />
         <Stack direction="row" spacing={1}>
           <Button type="submit" variant="outlined" color="secondary" disabled={saving || value === (job.post_url || '')}>Save</Button>
@@ -75,7 +75,7 @@ function PostLinkField({ job, onSaved, autoFocus }) {
       </Stack>
       {!job.post_url && (
         <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
-          Claude couldn't read this post's link. On Facebook, open the post's ⋯ menu → Copy link, then paste it here.
+          Claude couldn't read this post's link. Open the post's ⋯ or share menu → Copy link, then paste it here.
         </Typography>
       )}
     </Box>
@@ -135,7 +135,7 @@ function JobDetail({ job, onAction, onSaved, focusLink }) {
       )}
       {job.status === 'needs_check' && (
         <Alert severity="warning" sx={{ mt: 1.5 }}>
-          Claude may or may not have posted this. Check Facebook first; retrying a post that already went out will duplicate it.
+          Claude may or may not have posted this. Check the post's page first; retrying a post that already went out will duplicate it.
         </Alert>
       )}
       {log?.result && (
@@ -162,7 +162,7 @@ function JobDetail({ job, onAction, onSaved, focusLink }) {
           </Button>
         )}
         {['failed', 'cancelled'].includes(job.status) && (
-          <Tooltip title="Clears this from the Queue, with Claude's report. Nothing changes on Facebook.">
+          <Tooltip title="Clears this from the Queue, with Claude's report. Nothing changes on the social network.">
             <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => onAction(job.id, 'remove')}>Remove</Button>
           </Tooltip>
         )}
@@ -235,7 +235,7 @@ export default function Queue({ onChange }) {
                 </Box>
                 <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
                   <TypeBadge type={j.destination_type} withLabel={false} />
-                  <Tooltip title={`Open ${TYPE_LABEL[j.destination_type].toLowerCase()} on Facebook`}>
+                  <Tooltip title={`Open on ${PLATFORMS[j.destination_platform]?.label ?? 'Facebook'}`}>
                     <Link href={j.destination_url} target="_blank" rel="noreferrer" color="inherit" underline="hover" noWrap
                       onClick={(e) => e.stopPropagation()} sx={{ fontWeight: 700, fontSize: 14, minWidth: 0 }}>
                       {j.destination_name}
