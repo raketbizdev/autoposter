@@ -42,6 +42,10 @@ Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple S
   <a href="https://raket5.gumroad.com/l/autoposter"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time on Gumroad, Mac and Windows" width="560"></a>
 </p>
 
+<p align="center">
+  <img src="docs/buttons/lemon-squeezy-soon.svg" alt="Lemon Squeezy: coming soon" width="560">
+</p>
+
 <!-- Replace "coming soon" with the product link once it's live. -->
 | Store | Link |
 |---|---|
