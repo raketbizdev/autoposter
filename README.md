@@ -14,6 +14,8 @@
 
 <p align="center">
   <a href="#easy-install"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time, Mac and Windows" width="460"></a>
+  <br>
+  <img src="docs/buttons/lemon-squeezy-soon.svg" alt="Lemon Squeezy: coming soon" width="460">
 </p>
 
 A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
