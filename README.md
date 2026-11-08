@@ -114,6 +114,7 @@ version you [run from source](#run-from-source) and open in your browser at `htt
 | Real profile pictures for every account and Page | ✅ | — |
 | Built-in browser: links open inside Autoposter, logged in as the right account | ✅ | Opens in Chrome |
 | Checks posts waiting for group approval in the background | ✅ | Through Chrome |
+| **Big videos for TikTok and Reels**: up to 4 GB per post | ✅ | 10 MB (the Chrome extension's upload limit) |
 | Menu bar / tray app, starts with your computer, keeps it awake at post time | ✅ | — |
 | One-click installer for Mac and Windows, and automatic updates | ✅ | — |
 
@@ -177,7 +178,9 @@ Chrome must be signed in to each account you post to. The group gap applies betw
   plan's usage limits. When a limit is hit, the worker pauses for 1 hour and requeues the post.
 - **Check the terms yourself.** Make sure that running Claude Code unattended on a schedule is allowed by
   your current Claude subscription terms.
-- **Media is capped at 10 MB per post** (a limit of the Chrome extension's file upload), so most phone videos won't fit.
+- **Media size per post: 10 MB in the web app, 4 GB in the desktop app.** The web app uploads through the Claude in Chrome
+  extension, whose file upload stops at 10 MB, so most phone videos won't fit there. The desktop app attaches files in its
+  own window, so full TikTok videos and Reels fit.
 - If the computer sleeps, Chrome is closed or Facebook logs you out, posts run late or fail and the dashboard shows it.
   CAPTCHAs and security checks are never bypassed; the post fails and you handle it.
 - One Facebook login (the one in Chrome). Pages are posted to by switching into the Page.
