@@ -1,5 +1,15 @@
 # Autoposter
 
+[![Test and build](https://github.com/raketbizdev/autoposter/actions/workflows/build.yml/badge.svg)](https://github.com/raketbizdev/autoposter/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/raketbizdev/autoposter?style=flat&logo=github)](https://github.com/raketbizdev/autoposter/stargazers)
+![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
+[![Buy on Gumroad](https://img.shields.io/badge/Buy%20the%20app-Gumroad-ff90e8?logo=gumroad&logoColor=black)](https://raket5.gumroad.com/l/autoposter)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/raketbizdev)
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white)](https://paypal.me/freelancerdad)
+[![Watch the demo](https://img.shields.io/badge/Watch%20the%20demo-YouTube-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=91bvTaR6GKA)
+
 ![Autoposter](docs/screenshots/cover.png)
 
 A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
@@ -13,6 +23,12 @@ publishes the post on the website in your signed-in Chrome, the way you would by
 ```
 Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → the social network
 ```
+
+## Demo video
+
+[![Watch the Autoposter demo on YouTube](https://img.youtube.com/vi/91bvTaR6GKA/maxresdefault.jpg)](https://www.youtube.com/watch?v=91bvTaR6GKA)
+
+▶️ Click the picture to watch Autoposter schedule and publish posts.
 
 ## Easy install
 
@@ -121,6 +137,21 @@ npm run dev     # Vite dev server on :5173, proxying to npm start on :4317
 ```
 
 Data lives in `data/` (SQLite), `media/` (uploads), `jobs/` (per-run copies) and `logs/` (raw Claude output per run).
+
+## Support the project
+
+Autoposter's scheduler is free and open source. If it saves you time, you can help keep it going:
+
+- **Buy the desktop app** on [Gumroad](https://raket5.gumroad.com/l/autoposter). It's the easiest install, and every sale funds development.
+- **Star the repo** ⭐ so more people find it.
+- **Donate** any amount:
+
+  [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/raketbizdev)
+  [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/freelancerdad)
+
+  **GCash / InstaPay (Philippines):** scan with GCash, Maya or any bank app.
+
+  <img src="docs/donate/gcash-qr.jpg" alt="GCash InstaPay QR code for donations" width="220">
 
 ## License
 
