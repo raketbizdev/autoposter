@@ -12,6 +12,10 @@
 
 ![Autoposter](docs/screenshots/cover.png)
 
+<p align="center">
+  <a href="#easy-install"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time, Mac and Windows" width="460"></a>
+</p>
+
 A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
 worker runs **Claude Code on your Claude subscription** with the **Claude in Chrome** extension, and Claude
 publishes the post on the website in your signed-in Chrome, the way you would by hand.
@@ -34,11 +38,11 @@ Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -
 
 Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple Silicon and Intel) and Windows**:
 
-<!-- Replace "coming soon" with the product links once they're live. -->
-| Store | Link |
-|---|---|
-| **Lemon Squeezy** | coming soon |
-| **Gumroad** | [Buy on Gumroad](https://raket5.gumroad.com/l/autoposter) |
+<p align="center">
+  <a href="https://raket5.gumroad.com/l/autoposter"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time on Gumroad, Mac and Windows" width="560"></a>
+</p>
+
+<!-- Lemon Squeezy: coming soon. Add a second button here once the product link is live. -->
 
 $39, one-time payment. The first 100 customers get a launch discount code; it's posted on my Facebook page.
 
